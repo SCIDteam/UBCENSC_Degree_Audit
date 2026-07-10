@@ -53,15 +53,23 @@ class SpecializationAuditor:
 
     @classmethod
     def from_audit_bundle(cls, bundle):
-        """
-        Build a SpecializationAuditor from an AuditInputBundle.
-        """
-
+        allocation_config_df = (
+            bundle.specialization_requirements.allocation_config
+        )
+    
+        if allocation_config_df is not None:
+            allocation_config = AllocationConfig.from_dataframe(
+                allocation_config_df
+            )
+        else:
+            allocation_config = AllocationConfig()
+    
         return cls(
             requirement_groups=bundle.specialization_requirements.requirement_groups,
             requirement_courses=bundle.specialization_requirements.requirement_courses,
             profile=bundle.profile,
             options=bundle.options,
+            allocation_config=allocation_config,
         )
 
     # ------------------------------------------------------------------
@@ -85,7 +93,7 @@ class SpecializationAuditor:
             classified_courses
         )
         
-        applicable_groups = self._get_applicable_requirement_groups()
+        applicable_groups = self.resolver.get_applicable_requirement_groups()
         
         rows = []
         
@@ -246,7 +254,7 @@ class SpecializationAuditor:
         group_id = group["group_id"]
         rule_type = str(group.get("rule_type", "")).strip()
     
-        eligible_courses = self._get_group_course_codes(group_id)
+        eligible_courses = self.resolver.get_group_course_codes(group_id)
     
         matched = self._match_courses_to_eligible_list(
             courses=courses,
@@ -475,7 +483,7 @@ class SpecializationAuditor:
         eligibility rules.
         """
     
-        eligible_courses = self._get_complementary_studies_eligible_course_codes()
+        eligible_courses = self.resolver.get_complementary_studies_eligible_course_codes()
     
         source_groups = pd.DataFrame([group])
     
@@ -514,7 +522,7 @@ class SpecializationAuditor:
           rule_unit = course
         """
     
-        rule_subjects = self._split_semicolon(
+        rule_subjects = self.resolver.split_semicolon(
             group.get("rule_subject", "")
         )
     
@@ -551,11 +559,16 @@ class SpecializationAuditor:
                 f"label={group.get('label', '')}"
             )
     
-        matched = self._match_courses_to_level_requirement(
+        # matched = self.resolver.match_courses_to_level_requirement(
+        #     courses=courses,
+        #     rule_subjects=rule_subjects,
+        #     include_pattern=include_pattern,
+        #     exclude_pattern=exclude_pattern
+        # )
+        
+        matched = self.resolver.match_courses_to_level_requirement(
             courses=courses,
-            rule_subjects=rule_subjects,
-            include_pattern=include_pattern,
-            exclude_pattern=exclude_pattern
+            group_row=group,
         )
     
         matched_course_count = matched[
@@ -627,53 +640,6 @@ class SpecializationAuditor:
     # Requirement selection
     # ------------------------------------------------------------------
 
-    def _get_applicable_requirement_groups(self) -> pd.DataFrame:
-        df = self.requirement_groups.copy()
-
-        profile_program = str(self.profile.program).strip().upper()
-        profile_program_type = str(self.profile.program_type).strip().upper()
-        profile_option_id = str(self.profile.option_id or "").strip().upper()
-
-        if "program" in df.columns:
-            df["program_normalized"] = (
-                df["program"].astype(str).str.strip().str.upper()
-            )
-
-            df = df[
-                (df["program_normalized"] == profile_program)
-                | (df["program_normalized"] == "ALL")
-                | (df["program_normalized"] == "")
-            ]
-
-        if "program_type" in df.columns:
-            df["program_type_normalized"] = (
-                df["program_type"].astype(str).str.strip().str.upper()
-            )
-
-            df = df[
-                (df["program_type_normalized"] == profile_program_type)
-                | (df["program_type_normalized"] == "ALL")
-                | (df["program_type_normalized"] == "")
-            ]
-
-        if "option_id" in df.columns:
-            df["option_id_normalized"] = (
-                df["option_id"].astype(str).str.strip().str.upper()
-            )
-
-            df = df[
-                (df["option_id_normalized"] == profile_option_id)
-                | (df["option_id_normalized"] == "")
-            ]
-
-        if "is_recommended" in df.columns:
-            df = df[
-                df["is_recommended"].astype(str).str.lower()
-                != "true"
-            ]
-
-        return df.copy()
-
     def _should_skip_group(
         self,
         group: pd.Series
@@ -712,37 +678,6 @@ class SpecializationAuditor:
     # ------------------------------------------------------------------
     # Course matching helpers
     # ------------------------------------------------------------------
-
-    def _get_group_course_codes(
-        self,
-        group_id: str
-    ) -> list:
-        rows = self.requirement_courses[
-            self.requirement_courses["group_id"] == group_id
-        ]
-
-        return (
-            rows["course_code"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .tolist()
-        )
-
-    def _get_complementary_studies_eligible_course_codes(self) -> list:
-        rows = self.requirement_courses[
-            self.requirement_courses["requirement_area"]
-            == "Complementary Studies"
-        ]
-
-        return (
-            rows["course_code"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .drop_duplicates()
-            .tolist()
-        )
 
     def _match_courses_to_eligible_list(
         self,
@@ -794,73 +729,6 @@ class SpecializationAuditor:
                 return True
 
         return False
-    
-    def _match_courses_to_level_requirement(
-        self,
-        courses: pd.DataFrame,
-        rule_subjects: list[str],
-        include_pattern: str,
-        exclude_pattern: str
-    ) -> pd.DataFrame:
-        """
-        Match student courses to a subject/level requirement.
-    
-        include_pattern examples:
-        - 100-level
-        - 200-level
-        - 300-level
-        - 400-level
-    
-        exclude_pattern examples:
-        - PHYS100;PHYS170
-        """
-    
-        if courses.empty:
-            return pd.DataFrame(columns=courses.columns)
-    
-        if not rule_subjects:
-            return pd.DataFrame(columns=courses.columns)
-    
-        level_min, level_max = self._level_bounds_from_include_pattern(
-            include_pattern
-        )
-    
-        if level_min is None or level_max is None:
-            return pd.DataFrame(columns=courses.columns)
-    
-        excluded_courses = {
-            item.strip().upper()
-            for item in str(exclude_pattern).split(";")
-            if item.strip()
-        }
-    
-        normalized_subjects = {
-            subject.strip().upper()
-            for subject in rule_subjects
-            if subject.strip()
-        }
-    
-        matched = courses[
-            courses["subject"].astype(str).str.upper().isin(
-                normalized_subjects
-            )
-            &
-            (
-                pd.to_numeric(
-                    courses["course_number"],
-                    errors="coerce"
-                ).between(level_min, level_max)
-            )
-            &
-            (
-                ~courses["effective_course_code"]
-                .astype(str)
-                .str.upper()
-                .isin(excluded_courses)
-            )
-        ].copy()
-    
-        return matched
     
     @staticmethod
     def _level_bounds_from_include_pattern(
@@ -1035,17 +903,6 @@ class SpecializationAuditor:
             f"({';'.join(unique_courses)}); "
             f"source rule type: {group.get('rule_type', '')}."
         )
-    
-    @staticmethod
-    def _split_semicolon(value) -> list:
-        if value is None:
-            return []
-    
-        return [
-            item.strip()
-            for item in str(value).split(";")
-            if item.strip()
-        ]
 
     # ------------------------------------------------------------------
     # Input normalization and filtering
@@ -1156,7 +1013,7 @@ class SpecializationAuditor:
                 )
             )
     
-        eligible_courses = self._get_option_eligible_course_codes(
+        eligible_courses = self.resolver.get_option_eligible_course_codes(
             option_id=option_id
         )
     
@@ -1307,7 +1164,7 @@ class SpecializationAuditor:
             option_name=option_name
         )
     
-        source_group_ids = self._join_group_ids(source_groups)
+        source_group_ids = self.resolver.join_group_ids(source_groups)
     
         notes = (
             f"{notes_prefix} Source group IDs: {source_group_ids}. "
@@ -1340,7 +1197,7 @@ class SpecializationAuditor:
             return None
     
         if eligible_courses is None:
-            eligible_courses = self._get_course_codes_for_groups(source_groups)
+            eligible_courses = self.resolver.get_course_codes_for_groups(source_groups)
     
         matched = self._match_courses_to_eligible_list(
             courses=courses,
@@ -1364,7 +1221,7 @@ class SpecializationAuditor:
             suffix=synthetic_suffix
         )
     
-        source_group_ids = self._join_group_ids(source_groups)
+        source_group_ids = self.resolver.join_group_ids(source_groups)
     
         notes = (
             f"{notes_prefix} Source group IDs: {source_group_ids}. "
@@ -1387,7 +1244,7 @@ class SpecializationAuditor:
         courses: pd.DataFrame,
         applicable_groups: pd.DataFrame
     ) -> dict | None:
-        tools_groups = self._get_groups_by_requirement_area(
+        tools_groups = self.resolver.get_groups_by_requirement_area(
             applicable_groups,
             "Tools Elective"
         )
@@ -1500,59 +1357,6 @@ class SpecializationAuditor:
             }
         )
     
-    def _get_course_codes_for_groups(
-        self,
-        groups: pd.DataFrame
-    ) -> list:
-        if groups.empty:
-            return []
-    
-        group_ids = (
-            groups["group_id"]
-            .dropna()
-            .astype(str)
-            .tolist()
-        )
-    
-        rows = self.requirement_courses[
-            self.requirement_courses["group_id"].isin(group_ids)
-        ]
-    
-        return (
-            rows["course_code"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .drop_duplicates()
-            .tolist()
-        )
-    
-    def _get_groups_by_requirement_area(
-        self,
-        applicable_groups: pd.DataFrame,
-        requirement_area: str
-    ) -> pd.DataFrame:
-        if applicable_groups.empty:
-            return pd.DataFrame(columns=applicable_groups.columns)
-    
-        rows = applicable_groups[
-            applicable_groups["requirement_area"]
-            .astype(str)
-            .str.strip()
-            == requirement_area
-        ].copy()
-    
-        if "is_recommended" in rows.columns:
-            rows = rows[
-                rows["is_recommended"]
-                .astype(str)
-                .str.lower()
-                != "true"
-            ]
-    
-        return rows
-    
-    
     def _get_selected_option_name(
         self,
         applicable_groups: pd.DataFrame
@@ -1596,17 +1400,3 @@ class SpecializationAuditor:
             return ""
     
         return names.iloc[0]
-    
-    
-    @staticmethod
-    def _join_group_ids(groups: pd.DataFrame) -> str:
-        if groups.empty or "group_id" not in groups.columns:
-            return ""
-    
-        return ";".join(
-            groups["group_id"]
-            .dropna()
-            .astype(str)
-            .drop_duplicates()
-            .tolist()
-        )

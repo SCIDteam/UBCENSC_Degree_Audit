@@ -117,8 +117,8 @@ class FacultyAuditor:
             self._audit_arts_credits(counted_courses)
         )
         
-        other_faculty_row = self._audit_other_faculty_credits_cap(
-            counted_courses
+        rows.append(
+            self._audit_other_faculty_credits_cap(counted_courses)
         )
 
         rows.append(
@@ -705,7 +705,7 @@ class FacultyAuditor:
             "completed": completed_value,
             "required": required_value,
             "remaining": remaining_value,
-            "surplus": remaining_value,
+            "surplus": surplus_value,
             "unit": unit,
             "matched_courses": matched_courses,
             "notes": notes,

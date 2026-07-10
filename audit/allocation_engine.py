@@ -28,6 +28,7 @@ from typing import Optional
 import pandas as pd
 
 from .models import AllocationConfig
+from .specialization_requirement_resolver import SpecializationRequirementResolver
 
 
 class AllocationEngine:
@@ -51,13 +52,19 @@ class AllocationEngine:
         options,
         allocation_config: AllocationConfig | None = None,
     ):
-        self.requirement_groups = requirement_groups.copy().fillna("")
-        self.requirement_courses = requirement_courses.copy().fillna("")
         self.profile = profile
         self.options = options
         self.config = allocation_config or AllocationConfig()
-
-        self._normalize_inputs()
+        
+        self.resolver = SpecializationRequirementResolver(
+            requirement_groups=requirement_groups,
+            requirement_courses=requirement_courses,
+            profile=profile,
+            allocation_config=self.config,
+        )
+        
+        self.requirement_groups = self.resolver.requirement_groups
+        self.requirement_courses = self.resolver.requirement_courses
 
     @classmethod
     def from_audit_bundle(
@@ -204,9 +211,9 @@ class AllocationEngine:
             rule_type = str(audit_row.get("rule_type", "")).strip()
             requirement_area = str(audit_row.get("requirement_area", "")).strip()
 
-            bucket = self._bucket_for_row(audit_row)
+            bucket = self.resolver.bucket_for_row(audit_row)
 
-            if bucket == "option" and rule_type in self._rule_types_for_bucket("option"):
+            if bucket == "option" and rule_type in self.resolver.rule_types_for_bucket("option"):
                 rows.append(
                     self._allocated_credit_bucket_row(
                         audit_row=audit_row,
@@ -215,7 +222,7 @@ class AllocationEngine:
                     )
                 )
 
-            elif bucket == "tools" and rule_type in self._rule_types_for_bucket("tools"):
+            elif bucket == "tools" and rule_type in self.resolver.rule_types_for_bucket("tools"):
                 rows.append(
                     self._allocated_course_bucket_row(
                         audit_row=audit_row,
@@ -224,7 +231,7 @@ class AllocationEngine:
                     )
                 )
 
-            elif bucket == "complementary" and rule_type in self._rule_types_for_bucket("complementary"):
+            elif bucket == "complementary" and rule_type in self.resolver.rule_types_for_bucket("complementary"):
                 rows.append(
                     self._allocated_credit_bucket_row(
                         audit_row=audit_row,
@@ -323,11 +330,11 @@ class AllocationEngine:
                     override_group_id,
                 )
 
-                bucket = self._bucket_for_row_dict(group_info)
+                bucket = self.resolver.bucket_for_row_dict(group_info)
 
                 display_area = group_info.get(
                     "requirement_area",
-                    self._display_name_for_bucket(bucket),
+                    self.resolver.display_name_for_bucket(bucket),
                 )
 
                 df = self._assign_course(
@@ -344,7 +351,7 @@ class AllocationEngine:
                 )
 
             elif override_area:
-                bucket, display_area = self._normalize_override_area_to_bucket(
+                bucket, display_area = self.resolver.normalize_override_area_to_bucket(
                     override_area
                 )
 
@@ -371,14 +378,14 @@ class AllocationEngine:
     ) -> pd.DataFrame:
         df = allocation.copy()
 
-        core_rows = self._df_for_bucket(
+        core_rows = self.resolver.df_for_bucket(
             specialization_audit,
             bucket,
         )
 
         core_rows = core_rows[
             ~core_rows["rule_type"].astype(str).str.strip().isin(
-                self._rule_types_for_bucket(bucket)
+                self.resolver.rule_types_for_bucket(bucket)
             )
         ].copy()
 
@@ -403,7 +410,7 @@ class AllocationEngine:
     ) -> pd.DataFrame:
         df = allocation.copy()
 
-        rows = self._canonical_rows_for_bucket(
+        rows = self.resolver.canonical_rows_for_bucket(
             specialization_audit,
             bucket,
         )
@@ -418,7 +425,7 @@ class AllocationEngine:
         if required_count <= 0:
             return df
 
-        eligible_courses = self._get_eligible_courses_by_bucket(bucket)
+        eligible_courses = self.resolver.get_eligible_courses_by_bucket(bucket)
 
         selected_indices = self._select_unallocated_eligible_indices(
             allocation=df,
@@ -430,9 +437,9 @@ class AllocationEngine:
             df = self._assign_course(
                 df=df,
                 idx=idx,
-                requirement_area=self._display_name_for_bucket(bucket),
+                requirement_area=self.resolver.display_name_for_bucket(bucket),
                 group_id=str(audit_row.get("group_id", "")),
-                label=str(audit_row.get("label", self._display_name_for_bucket(bucket))),
+                label=str(audit_row.get("label", self.resolver.display_name_for_bucket(bucket))),
                 rule_type=str(audit_row.get("rule_type", "")),
                 bucket=bucket,
                 priority=priority,
@@ -452,7 +459,7 @@ class AllocationEngine:
     ) -> pd.DataFrame:
         df = allocation.copy()
 
-        rows = self._canonical_rows_for_bucket(
+        rows = self.resolver.canonical_rows_for_bucket(
             specialization_audit,
             bucket,
         )
@@ -473,7 +480,7 @@ class AllocationEngine:
         if remaining_credits <= 0:
             return df
 
-        eligible_courses = self._get_eligible_courses_by_bucket(bucket)
+        eligible_courses = self.resolver.get_eligible_courses_by_bucket(bucket)
 
         selected_indices = self._select_unallocated_eligible_indices_by_credits(
             allocation=df,
@@ -485,9 +492,9 @@ class AllocationEngine:
             df = self._assign_course(
                 df=df,
                 idx=idx,
-                requirement_area=self._display_name_for_bucket(bucket),
+                requirement_area=self.resolver.display_name_for_bucket(bucket),
                 group_id=str(audit_row.get("group_id", "")),
-                label=str(audit_row.get("label", self._display_name_for_bucket(bucket))),
+                label=str(audit_row.get("label", self.resolver.display_name_for_bucket(bucket))),
                 rule_type=str(audit_row.get("rule_type", "")),
                 bucket=bucket,
                 priority=priority,
@@ -520,14 +527,14 @@ class AllocationEngine:
         if not option_id:
             return df
 
-        option_rows = self._df_for_bucket(
+        option_rows = self.resolver.df_for_bucket(
             specialization_audit,
             bucket,
         )
 
         specific_rows = option_rows[
             ~option_rows["rule_type"].astype(str).str.strip().isin(
-                self._rule_types_for_bucket(bucket) + ["theme_minimum"]
+                self.resolver.rule_types_for_bucket(bucket) + ["theme_minimum"]
             )
         ].copy()
 
@@ -540,7 +547,7 @@ class AllocationEngine:
                 method_prefix="priority_option_specific",
             )
 
-        canonical_rows = self._canonical_rows_for_bucket(
+        canonical_rows = self.resolver.canonical_rows_for_bucket(
             specialization_audit,
             bucket,
         )
@@ -561,7 +568,7 @@ class AllocationEngine:
         if remaining_credits <= 0:
             return df
 
-        eligible_courses = self._get_option_eligible_course_codes(
+        eligible_courses = self.resolver.get_option_eligible_course_codes(
             option_id
         )
 
@@ -575,9 +582,9 @@ class AllocationEngine:
             df = self._assign_course(
                 df=df,
                 idx=idx,
-                requirement_area=self._display_name_for_bucket(bucket),
+                requirement_area=self.resolver.display_name_for_bucket(bucket),
                 group_id=str(total_row.get("group_id", "")),
-                label=str(total_row.get("label", self._display_name_for_bucket(bucket))),
+                label=str(total_row.get("label", self.resolver.display_name_for_bucket(bucket))),
                 rule_type=str(total_row.get("rule_type", "")),
                 bucket=bucket,
                 priority=priority_total,
@@ -605,7 +612,7 @@ class AllocationEngine:
             df = self._assign_course(
                 df=df,
                 idx=idx,
-                requirement_area=self._display_name_for_bucket(bucket),
+                requirement_area=self.resolver.display_name_for_bucket(bucket),
                 group_id="",
                 label=self.config.residual_label,
                 rule_type="residual_elective",
@@ -643,7 +650,7 @@ class AllocationEngine:
             required=required,
             unit="credits",
             allocated_courses=self._course_list(matched),
-            notes=f"Post-allocation credit bucket for {self._display_name_for_bucket(bucket)}.",
+            notes=f"Post-allocation credit bucket for {self.resolver.display_name_for_bucket(bucket)}.",
         )
 
     def _allocated_course_bucket_row(
@@ -668,7 +675,7 @@ class AllocationEngine:
             required=required,
             unit="course",
             allocated_courses=self._course_list(matched),
-            notes=f"Post-allocation course bucket for {self._display_name_for_bucket(bucket)}.",
+            notes=f"Post-allocation course bucket for {self.resolver.display_name_for_bucket(bucket)}.",
         )
 
     def _allocated_specific_group_row(
@@ -688,10 +695,10 @@ class AllocationEngine:
             )
         ].copy()
 
-        eligible_courses = self._get_group_course_codes(group_id)
+        eligible_courses = self.resolver.get_group_course_codes(group_id)
 
         if eligible_courses:
-            matched = self._filter_courses_by_eligible_codes(
+            matched = self.resolver.filter_courses_by_eligible_codes(
                 matched,
                 eligible_courses,
             )
@@ -790,7 +797,10 @@ class AllocationEngine:
         df = allocation.copy()
 
         group_id = str(audit_row.get("group_id", "")).strip()
-        rule_type = str(audit_row.get("rule_type", "")).strip()
+        group_metadata = self.resolver.get_group_metadata(group_id)
+        rule_type = str(
+            group_metadata.get("rule_type", audit_row.get("rule_type", ""))
+        ).strip()
         required = float(audit_row.get("required", 0))
         unit = str(audit_row.get("unit", "")).strip()
 
@@ -803,7 +813,7 @@ class AllocationEngine:
                 audit_row=audit_row,
             )
         else:
-            eligible_courses = self._get_group_course_codes(group_id)
+            eligible_courses = self.resolver.get_group_course_codes(group_id)
             eligible_indices = self._eligible_unallocated_indices(
                 allocation=df,
                 eligible_course_codes=eligible_courses,
@@ -829,7 +839,7 @@ class AllocationEngine:
             df = self._assign_course(
                 df=df,
                 idx=idx,
-                requirement_area=self._display_name_for_bucket(bucket),
+                requirement_area=self.resolver.display_name_for_bucket(bucket),
                 group_id=group_id,
                 label=str(audit_row.get("label", "")),
                 rule_type=rule_type,
@@ -870,7 +880,7 @@ class AllocationEngine:
 
             student_code = str(row.get("effective_course_code", "")).strip().upper()
 
-            if self._course_matches_any_eligible(student_code, eligible_set):
+            if self.resolver.course_matches_any_eligible(student_code, eligible_set):
                 indices.append(idx)
 
         return indices
@@ -880,68 +890,28 @@ class AllocationEngine:
         allocation: pd.DataFrame,
         audit_row: pd.Series,
     ) -> list:
-        rule_subjects = self._split_semicolon(
-            audit_row.get("rule_subject", "")
-        )
-
-        include_pattern = str(
-            audit_row.get("include_pattern", "")
-        ).strip()
-
-        exclude_pattern = str(
-            audit_row.get("exclude_pattern", "")
-        ).strip()
-
-        level_min, level_max = self._level_bounds_from_include_pattern(
-            include_pattern
-        )
-
-        if level_min is None or level_max is None:
+        group_id = str(audit_row.get("group_id", "")).strip()
+    
+        if not group_id:
             return []
-
-        excluded_courses = {
-            item.strip().upper()
-            for item in str(exclude_pattern).split(";")
-            if item.strip()
-        }
-
-        normalized_subjects = {
-            subject.strip().upper()
-            for subject in rule_subjects
-            if subject.strip()
-        }
-
+    
+        group_row = self.resolver.get_group_series(group_id)
+    
         indices = []
-
-        for idx, row in allocation.iterrows():
-            if not self._is_counted_row(row):
+    
+        for idx, course_row in allocation.iterrows():
+            if not self._is_counted_row(course_row):
                 continue
-
-            if self._is_allocated(row):
+    
+            if self._is_allocated(course_row):
                 continue
-
-            subject = str(row.get("subject", "")).strip().upper()
-            code = str(row.get("effective_course_code", "")).strip().upper()
-
-            course_number = pd.to_numeric(
-                row.get("course_number", None),
-                errors="coerce",
-            )
-
-            if pd.isna(course_number):
-                continue
-
-            if subject not in normalized_subjects:
-                continue
-
-            if not (level_min <= course_number <= level_max):
-                continue
-
-            if code in excluded_courses:
-                continue
-
-            indices.append(idx)
-
+    
+            if self.resolver.course_matches_level_requirement(
+                course_row=course_row,
+                group_row=group_row,
+            ):
+                indices.append(idx)
+    
         return indices
 
     def _select_unallocated_eligible_indices(
@@ -1046,148 +1016,6 @@ class AllocationEngine:
     # Requirement / course lookup helpers
     # ------------------------------------------------------------------
 
-    def _get_group_course_codes(
-        self,
-        group_id: str,
-    ) -> list:
-        rows = self.requirement_courses[
-            self.requirement_courses["group_id"] == group_id
-        ]
-
-        return (
-            rows["course_code"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .drop_duplicates()
-            .tolist()
-        )
-
-    def _get_option_eligible_course_codes(
-        self,
-        option_id: str,
-    ) -> list:
-        profile_program = str(self.profile.program).strip().upper()
-        profile_calendar_year = str(self.profile.calendar_year).strip()
-        profile_program_type = str(self.profile.program_type).strip().upper()
-
-        rows = self.requirement_courses.copy()
-
-        rows["program_normalized"] = (
-            rows["program"].astype(str).str.strip().str.upper()
-        )
-        rows["calendar_year_normalized"] = (
-            rows["calendar_year"].astype(str).str.strip()
-        )
-        rows["program_type_normalized"] = (
-            rows["program_type"].astype(str).str.strip().str.upper()
-        )
-        rows["option_id_normalized"] = (
-            rows["option_id"].astype(str).str.strip().str.upper()
-        )
-
-        option_areas = self._areas_for_bucket("option")
-
-        rows = rows[
-            rows["requirement_area"].astype(str).str.strip().isin(option_areas)
-            & (rows["option_id_normalized"] == option_id.upper())
-            & (
-                (rows["program_normalized"] == profile_program)
-                | (rows["program_normalized"] == "ALL")
-                | (rows["program_normalized"] == "")
-            )
-            & (
-                (rows["calendar_year_normalized"] == profile_calendar_year)
-                | (rows["calendar_year_normalized"] == "ALL")
-                | (rows["calendar_year_normalized"] == "")
-            )
-            & (
-                (rows["program_type_normalized"] == profile_program_type)
-                | (rows["program_type_normalized"] == "ALL")
-                | (rows["program_type_normalized"] == "")
-            )
-            & (
-                rows["is_recommended"].astype(str).str.lower() != "true"
-            )
-        ]
-
-        return (
-            rows["course_code"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .drop_duplicates()
-            .tolist()
-        )
-
-    def _get_eligible_courses_by_bucket(
-        self,
-        bucket: str,
-    ) -> list:
-        areas = self._areas_for_bucket(bucket)
-
-        rows = self.requirement_courses[
-            self.requirement_courses["requirement_area"]
-            .astype(str)
-            .str.strip()
-            .isin(areas)
-        ]
-
-        return (
-            rows["course_code"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .drop_duplicates()
-            .tolist()
-        )
-
-    @staticmethod
-    def _course_matches_any_eligible(
-        student_code: str,
-        eligible_course_codes,
-    ) -> bool:
-        if not student_code:
-            return False
-
-        for eligible in eligible_course_codes:
-            eligible = str(eligible).strip().upper()
-
-            if not eligible:
-                continue
-
-            if eligible.endswith("*"):
-                prefix = eligible.replace("*", "")
-
-                if student_code.startswith(prefix):
-                    return True
-
-            elif student_code == eligible:
-                return True
-
-        return False
-
-    def _filter_courses_by_eligible_codes(
-        self,
-        courses: pd.DataFrame,
-        eligible_course_codes: list[str],
-    ) -> pd.DataFrame:
-        indices = []
-
-        eligible_set = {
-            str(code).strip().upper()
-            for code in eligible_course_codes
-            if str(code).strip()
-        }
-
-        for idx, row in courses.iterrows():
-            student_code = str(row.get("effective_course_code", "")).strip().upper()
-
-            if self._course_matches_any_eligible(student_code, eligible_set):
-                indices.append(idx)
-
-        return courses.loc[indices].copy()
-
     def _lookup_audit_group(
         self,
         specialization_audit: pd.DataFrame,
@@ -1201,122 +1029,6 @@ class AllocationEngine:
             return {}
 
         return rows.iloc[0].to_dict()
-
-    # ------------------------------------------------------------------
-    # Config helpers
-    # ------------------------------------------------------------------
-
-    def _areas_for_bucket(
-        self,
-        bucket: str,
-    ) -> list:
-        return self.config.requirement_area_map.get(bucket, [])
-
-    def _display_name_for_bucket(
-        self,
-        bucket: str,
-    ) -> str:
-        return self.config.bucket_display_names.get(bucket, bucket)
-
-    def _rule_types_for_bucket(
-        self,
-        bucket: str,
-    ) -> list:
-        return self.config.canonical_rule_type_map.get(bucket, [])
-
-    def _df_for_bucket(
-        self,
-        df: pd.DataFrame,
-        bucket: str,
-    ) -> pd.DataFrame:
-        if df.empty:
-            return df.copy()
-
-        areas = self._areas_for_bucket(bucket)
-        rule_types = self._rule_types_for_bucket(bucket)
-
-        return df[
-            df["requirement_area"].astype(str).str.strip().isin(areas)
-            |
-            df["rule_type"].astype(str).str.strip().isin(rule_types)
-        ].copy()
-
-    def _canonical_rows_for_bucket(
-        self,
-        df: pd.DataFrame,
-        bucket: str,
-    ) -> pd.DataFrame:
-        rule_types = self._rule_types_for_bucket(bucket)
-
-        if not rule_types:
-            return pd.DataFrame(columns=df.columns)
-
-        return df[
-            df["rule_type"].astype(str).str.strip().isin(rule_types)
-        ].copy()
-
-    def _bucket_for_row(
-        self,
-        row,
-    ) -> str:
-        requirement_area = str(row.get("requirement_area", "")).strip()
-        rule_type = str(row.get("rule_type", "")).strip()
-
-        for bucket in self.config.priority_order:
-            if requirement_area in self._areas_for_bucket(bucket):
-                return bucket
-
-            if rule_type in self._rule_types_for_bucket(bucket):
-                return bucket
-
-        return ""
-
-    def _bucket_for_row_dict(
-        self,
-        row: dict,
-    ) -> str:
-        if not row:
-            return ""
-
-        requirement_area = str(row.get("requirement_area", "")).strip()
-        rule_type = str(row.get("rule_type", "")).strip()
-
-        for bucket in self.config.priority_order:
-            if requirement_area in self._areas_for_bucket(bucket):
-                return bucket
-
-            if rule_type in self._rule_types_for_bucket(bucket):
-                return bucket
-
-        return ""
-
-    def _normalize_override_area_to_bucket(
-        self,
-        override_area: str,
-    ) -> tuple[str, str]:
-        """
-        Allow override_exclusive_requirement_area to be either:
-        - generic bucket name, e.g. option
-        - display name / requirement_area, e.g. Area of Concentration
-        """
-
-        value = str(override_area).strip()
-
-        if not value:
-            return "", ""
-
-        value_lower = value.lower()
-
-        for bucket in self.config.requirement_area_map:
-            if value_lower == bucket.lower():
-                return bucket, self._display_name_for_bucket(bucket)
-
-        for bucket, areas in self.config.requirement_area_map.items():
-            for area in areas:
-                if value_lower == area.lower():
-                    return bucket, area
-
-        return value, value
 
     # ------------------------------------------------------------------
     # Allocation column helpers
@@ -1593,39 +1305,6 @@ class AllocationEngine:
         }
 
     @staticmethod
-    def _split_semicolon(
-        value,
-    ) -> list:
-        if value is None:
-            return []
-
-        return [
-            item.strip()
-            for item in str(value).split(";")
-            if item.strip()
-        ]
-
-    @staticmethod
-    def _level_bounds_from_include_pattern(
-        include_pattern: str,
-    ) -> tuple[Optional[int], Optional[int]]:
-        import re
-
-        text = str(include_pattern).strip().lower()
-
-        match = re.match(
-            r"^(\d)00-level$",
-            text,
-        )
-
-        if not match:
-            return None, None
-
-        lower = int(match.group(1)) * 100
-
-        return lower, lower + 99
-
-    @staticmethod
     def _course_list(
         courses: pd.DataFrame,
     ) -> str:
@@ -1639,46 +1318,3 @@ class AllocationEngine:
             .drop_duplicates()
             .tolist()
         )
-
-    def _normalize_inputs(
-        self,
-    ) -> None:
-        for df in [
-            self.requirement_groups,
-            self.requirement_courses,
-        ]:
-            for column in [
-                "group_id",
-                "program",
-                "calendar_year",
-                "program_type",
-                "requirement_area",
-                "option_id",
-                "option_name",
-                "theme",
-                "rule_type",
-                "course_code",
-                "is_recommended",
-                "rule_subject",
-                "include_pattern",
-                "exclude_pattern",
-                "rule_unit",
-            ]:
-                if column not in df.columns:
-                    df[column] = ""
-
-        for column in [
-            "credits",
-            "rule_value",
-        ]:
-            if column in self.requirement_groups.columns:
-                self.requirement_groups[column] = pd.to_numeric(
-                    self.requirement_groups[column],
-                    errors="coerce",
-                )
-
-            if column in self.requirement_courses.columns:
-                self.requirement_courses[column] = pd.to_numeric(
-                    self.requirement_courses[column],
-                    errors="coerce",
-                )

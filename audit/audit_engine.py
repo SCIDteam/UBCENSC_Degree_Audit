@@ -249,13 +249,28 @@ class AuditEngine:
 
         self.print_quick_counts(working)
 
-        self.print_promotion_target_summary(working)
-
-        self.print_missing_or_partial_requirements(
+        self.print_faculty_section(
             working=working,
-            max_missing_rows=max_missing_rows,
+            max_rows=max_missing_rows,
+        )
+
+        self.print_specialization_section(
+            working=working,
+            max_rows=max_missing_rows,
             max_courses_to_show=max_courses_to_show,
         )
+
+        self.print_promotion_target_section(
+            working=working,
+            max_rows=max_missing_rows,
+        )
+
+        self.print_electives_section(
+            working=working,
+            max_courses_to_show=max_courses_to_show,
+        )
+
+        print()
 
     def print_case_header(
         self,
@@ -307,122 +322,90 @@ class AuditEngine:
             f"Allocated specialization audit: "
             f"{spec_satisfied}/{spec_total} specifications satisfied"
         )
-        print()
 
-    def print_promotion_target_summary(
-        self,
-        working: AuditWorkingData,
-    ) -> None:
         target_year = self._promotion_target_year()
 
-        if target_year is None:
-            print("Promotion target: unknown because academic_year is missing.")
-            print()
-            return
+        if target_year is not None:
+            promotion_rows = self._promotion_rows_for_target(
+                working.promotion_audit,
+                target_year,
+            )
 
-        rows = self._promotion_rows_for_target(
-            working.promotion_audit,
-            target_year,
-        )
+            promotion_satisfied, promotion_total = self._status_counts(
+                promotion_rows,
+                status_column="status",
+            )
 
-        if rows.empty:
-            print(f"Promotion to Year {target_year}: not evaluated")
-            print()
-            return
+            if promotion_total > 0:
+                print(
+                    f"Promotion to Year {target_year}: "
+                    f"{promotion_satisfied}/{promotion_total} specifications satisfied"
+                )
 
-        satisfied, total = self._status_counts(
-            rows,
-            status_column="status",
-        )
-
-        if satisfied == total:
-            status = "satisfied"
-        elif satisfied > 0:
-            status = "partial"
-        else:
-            status = "missing"
-
-        print(
-            f"Promotion to Year {target_year}: "
-            f"{status} ({satisfied}/{total} specifications satisfied)"
-        )
         print()
 
-    def print_missing_or_partial_requirements(
+    # ------------------------------------------------------------------
+    # Human-readable sections
+    # ------------------------------------------------------------------
+
+    def print_faculty_section(
         self,
         working: AuditWorkingData,
-        max_missing_rows: int = 12,
-        max_courses_to_show: int = 3,
+        max_rows: int = 12,
     ) -> None:
-        print("Missing or Partial Requirements")
-        print("-------------------------------")
+        print("Faculty")
+        print("-------")
 
-        sections_printed = 0
+        faculty_df = working.faculty_audit_summary
 
-        sections_printed += self._print_missing_faculty_rows(
-            working.faculty_audit_summary,
-            max_rows=max_missing_rows,
-        )
-
-        sections_printed += self._print_missing_allocated_specialization_rows(
-            working.allocated_specialization_audit,
-            max_rows=max_missing_rows,
-            max_courses_to_show=max_courses_to_show,
-        )
-
-        sections_printed += self._print_missing_promotion_target_rows(
-            working.promotion_audit,
-            max_rows=max_missing_rows,
-        )
-
-        if sections_printed == 0:
-            print()
-            print("No missing or partial requirements found in the selected audit mode.")
-
-        print()
-
-    # ------------------------------------------------------------------
-    # Missing/partial section printers
-    # ------------------------------------------------------------------
-
-    def _print_missing_faculty_rows(
-        self,
-        faculty_df: pd.DataFrame | None,
-        max_rows: int,
-    ) -> int:
         if faculty_df is None or faculty_df.empty:
-            return 0
+            print("Faculty audit was not evaluated.")
+            print()
+            return
 
         missing = faculty_df[
             faculty_df["status"].astype(str).str.lower() != "satisfied"
         ].copy()
 
         if missing.empty:
-            return 0
+            print("All requirements satisfied.")
+        else:
+            satisfied, total = self._status_counts(
+                faculty_df,
+                status_column="status",
+            )
+
+            print(f"{satisfied}/{total} requirements satisfied.")
+            print()
+
+            for _, row in missing.head(max_rows).iterrows():
+                print(self._describe_faculty_row(row))
+                print()
+
+            remaining = len(missing) - max_rows
+
+            if remaining > 0:
+                print(f"... {remaining} additional Faculty requirement(s) not shown.")
+
+        self._print_other_faculty_credit_capacity(faculty_df)
 
         print()
-        print("Faculty:")
 
-        for _, row in missing.head(max_rows).iterrows():
-            print(self._describe_faculty_row(row))
-            print()
-
-        remaining = len(missing) - max_rows
-
-        if remaining > 0:
-            print(f"... {remaining} additional Faculty requirement(s) not shown.")
-            print()
-
-        return 1
-
-    def _print_missing_allocated_specialization_rows(
+    def print_specialization_section(
         self,
-        allocated_df: pd.DataFrame | None,
-        max_rows: int,
-        max_courses_to_show: int,
-    ) -> int:
+        working: AuditWorkingData,
+        max_rows: int = 12,
+        max_courses_to_show: int = 3,
+    ) -> None:
+        print("Specialization")
+        print("--------------")
+
+        allocated_df = working.allocated_specialization_audit
+
         if allocated_df is None or allocated_df.empty:
-            return 0
+            print("Allocated specialization audit was not evaluated.")
+            print()
+            return
 
         status_column = (
             "allocated_status"
@@ -435,70 +418,142 @@ class AuditEngine:
         ].copy()
 
         if missing.empty:
-            return 0
+            print("All requirements satisfied.")
+        else:
+            satisfied, total = self._status_counts(
+                allocated_df,
+                status_column=status_column,
+            )
+
+            print(f"{satisfied}/{total} requirements satisfied.")
+            print()
+
+            for _, row in missing.head(max_rows).iterrows():
+                print(
+                    self._describe_allocated_specialization_row(
+                        row=row,
+                        status_column=status_column,
+                        max_courses_to_show=max_courses_to_show,
+                    )
+                )
+                print()
+
+            remaining = len(missing) - max_rows
+
+            if remaining > 0:
+                print(
+                    f"... {remaining} additional specialization requirement(s) not shown."
+                )
 
         print()
-        print("Specialization:")
 
-        for _, row in missing.head(max_rows).iterrows():
-            print(
-                self._describe_allocated_specialization_row(
-                    row,
-                    status_column=status_column,
-                    max_courses_to_show=max_courses_to_show,
-                )
-            )
-            print()
-
-        remaining = len(missing) - max_rows
-
-        if remaining > 0:
-            print(
-                f"... {remaining} additional specialization requirement(s) not shown."
-            )
-            print()
-
-        return 1
-
-    def _print_missing_promotion_target_rows(
+    def print_promotion_target_section(
         self,
-        promotion_df: pd.DataFrame | None,
-        max_rows: int,
-    ) -> int:
+        working: AuditWorkingData,
+        max_rows: int = 12,
+    ) -> None:
         target_year = self._promotion_target_year()
 
         if target_year is None:
-            return 0
+            print("Promotion")
+            print("---------")
+            print("Promotion target is unknown because academic_year is missing.")
+            print()
+            return
+
+        print(f"Promotion to Year {target_year}")
+        print("-------------------")
 
         rows = self._promotion_rows_for_target(
-            promotion_df,
+            working.promotion_audit,
             target_year,
         )
 
         if rows.empty:
-            return 0
+            print("Promotion requirements were not evaluated.")
+            print()
+            return
 
         missing = rows[
             rows["status"].astype(str).str.lower() != "satisfied"
         ].copy()
 
         if missing.empty:
-            return 0
+            print("All requirements satisfied.")
+        else:
+            satisfied, total = self._status_counts(
+                rows,
+                status_column="status",
+            )
+
+            print(f"{satisfied}/{total} requirements satisfied.")
+            print()
+
+            for _, row in missing.head(max_rows).iterrows():
+                print(self._describe_promotion_row(row))
+                print()
+
+            remaining = len(missing) - max_rows
+
+            if remaining > 0:
+                print(f"... {remaining} additional promotion requirement(s) not shown.")
 
         print()
-        print(f"Promotion to Year {target_year}:")
 
-        for _, row in missing.head(max_rows).iterrows():
-            print(self._describe_promotion_row(row))
+    def print_electives_section(
+        self,
+        working: AuditWorkingData,
+        max_courses_to_show: int = 3,
+    ) -> None:
+        print("Electives / Allocation")
+        print("----------------------")
+
+        allocation = working.course_allocation
+
+        if allocation is None or allocation.empty:
+            print("Course allocation was not evaluated.")
             print()
+            return
 
-        remaining = len(missing) - max_rows
+        electives = allocation[
+            allocation["exclusive_bucket"].astype(str).str.strip()
+            == "electives"
+        ].copy()
 
-        if remaining > 0:
-            print(f"... {remaining} additional promotion requirement(s) not shown.")
-            print()
+        elective_credits = float(electives["credits"].sum()) if not electives.empty else 0
 
-        return 1
+        print(
+            f"You have {self._format_number(elective_credits)} credits "
+            "allocated as free/residual electives under this plan."
+        )
+
+        if not electives.empty:
+            elective_courses = ";".join(
+                electives["effective_course_code"]
+                .dropna()
+                .astype(str)
+                .drop_duplicates()
+                .tolist()
+            )
+
+            limited_courses = self._limited_course_list(
+                elective_courses,
+                max_courses=max_courses_to_show,
+            )
+
+            if limited_courses:
+                print(f"Example elective courses: {limited_courses}")
+
+        print(
+            "These credits still count toward total degree credits, "
+            "subject to Faculty limits."
+        )
+
+        self._print_other_faculty_elective_capacity(
+            working=working
+        )
+
+        print()
 
     # ------------------------------------------------------------------
     # Row description helpers
@@ -616,6 +671,103 @@ class AuditEngine:
             lines.append(f"  Notes: {notes}")
 
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Other-faculty / non-Arts non-Science helpers
+    # ------------------------------------------------------------------
+
+    def _print_other_faculty_credit_capacity(
+        self,
+        faculty_df: pd.DataFrame,
+    ) -> None:
+        cap_row = self._get_other_faculty_cap_row(faculty_df)
+
+        if cap_row is None:
+            return
+
+        completed = cap_row.get("completed", 0)
+        maximum = cap_row.get("required", 0)
+        remaining_capacity = cap_row.get("remaining", 0)
+        surplus = cap_row.get("surplus", 0)
+        status = str(cap_row.get("status", "")).strip().lower()
+        unit = cap_row.get("unit", "credits")
+
+        print()
+        print("Other-faculty credit capacity:")
+
+        if status == "exceeds_limit":
+            print(
+                f"You have {self._format_number(completed)} / "
+                f"{self._format_number(maximum)} {unit} from courses that are "
+                "neither Science nor Arts."
+            )
+            print(
+                f"You are over the current limit by "
+                f"{self._format_number(surplus)} {unit}."
+            )
+        else:
+            print(
+                f"You have {self._format_number(completed)} / "
+                f"{self._format_number(maximum)} {unit} from courses that are "
+                "neither Science nor Arts."
+            )
+            print(
+                f"You can take up to "
+                f"{self._format_number(remaining_capacity)} more {unit} "
+                "outside Science and Arts under the current Faculty cap."
+            )
+
+    def _print_other_faculty_elective_capacity(
+        self,
+        working: AuditWorkingData,
+    ) -> None:
+        faculty_df = working.faculty_audit_summary
+
+        if faculty_df is None or faculty_df.empty:
+            return
+
+        cap_row = self._get_other_faculty_cap_row(faculty_df)
+
+        if cap_row is None:
+            return
+
+        remaining_capacity = cap_row.get("remaining", 0)
+        surplus = cap_row.get("surplus", 0)
+        status = str(cap_row.get("status", "")).strip().lower()
+        unit = cap_row.get("unit", "credits")
+
+        if status == "exceeds_limit":
+            print(
+                f"Non-Arts/non-Science cap exceeded by "
+                f"{self._format_number(surplus)} {unit}."
+            )
+        else:
+            print(
+                f"Remaining non-Arts/non-Science capacity: "
+                f"{self._format_number(remaining_capacity)} {unit}."
+            )
+
+    @staticmethod
+    def _get_other_faculty_cap_row(
+        faculty_df: pd.DataFrame,
+    ):
+        if faculty_df is None or faculty_df.empty:
+            return None
+
+        if "requirement_id" not in faculty_df.columns:
+            return None
+
+        rows = faculty_df[
+            faculty_df["requirement_id"]
+            .astype(str)
+            .str.upper()
+            == "OTHER_FACULTY_CREDITS_CAP"
+        ]
+
+        if rows.empty:
+            return None
+
+        return rows.iloc[0]
 
     # ------------------------------------------------------------------
     # Summary calculation helpers

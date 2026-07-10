@@ -24,7 +24,7 @@ pdb.set_trace()
 #student_case_dir = "student_inputs/example_student_honours_land_air_water"
 student_case_dir = "student_inputs/example_student_002"
 count_statuses = []
-audit_mode = 'in-progress'
+audit_mode = 'in-progress' #'planned' #'planned'
 write_outputs = False
 print_outputs = True
 
@@ -59,6 +59,12 @@ bundle = load_ensc_audit_case(
 engine = AuditEngine.from_bundle(bundle)
 
 working = engine.run()
+
+faculty_audit_summary = working.faculty_audit_summary
+promotion_audit = working.promotion_audit
+specialization_audit = working.specialization_audit
+course_allocation = working.course_allocation
+allocated_specialization_audit = working.allocated_specialization_audit
 
 if print_outputs:
     engine.print_summary(

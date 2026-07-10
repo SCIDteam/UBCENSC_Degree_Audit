@@ -197,7 +197,8 @@ class SpecializationRequirementResolver:
     def areas_for_bucket(
         self,
         bucket: str,
-    ) -> listreturn self.config.requirement_area_map.get(bucket, [])
+    ) -> list:
+        return self.config.requirement_area_map.get(bucket, [])
 
     def display_name_for_bucket(
         self,
@@ -208,7 +209,8 @@ class SpecializationRequirementResolver:
     def rule_types_for_bucket(
         self,
         bucket: str,
-    ) -> listreturn self.config.canonical_rule_type_map.get(bucket, [])
+    ) -> list:
+        return self.config.canonical_rule_type_map.get(bucket, [])
 
     def bucket_for_row(
         self,
@@ -260,7 +262,7 @@ class SpecializationRequirementResolver:
             df["rule_type"].astype(str).str.strip().isin(rule_types)
         ].copy()
 
-    def groups_by_requirement_area(
+    def get_groups_by_requirement_area(
         self,
         applicable_groups: pd.DataFrame,
         requirement_area: str,
@@ -323,7 +325,8 @@ class SpecializationRequirementResolver:
     def get_group_course_codes(
         self,
         group_id: str,
-    ) -> listrows = self.requirement_courses[
+    ) -> list:
+        rows = self.requirement_courses[
             self.requirement_courses["group_id"].astype(str) == str(group_id)
         ]
 
@@ -339,7 +342,8 @@ class SpecializationRequirementResolver:
     def get_course_codes_for_groups(
         self,
         groups: pd.DataFrame,
-    ) -> listif groups is None or groups.empty:
+    ) -> list:
+        if groups is None or groups.empty:
             return []
 
         group_ids = (
@@ -365,7 +369,8 @@ class SpecializationRequirementResolver:
     def get_eligible_courses_by_bucket(
         self,
         bucket: str,
-    ) -> listareas = self.areas_for_bucket(bucket)
+    ) -> list:
+        areas = self.areas_for_bucket(bucket)
 
         rows = self.requirement_courses[
             self.requirement_courses["requirement_area"]
@@ -386,7 +391,8 @@ class SpecializationRequirementResolver:
     def get_option_eligible_course_codes(
         self,
         option_id: str,
-    ) -> list"""
+    ) -> list:
+        """
         Return eligible courses for selected option-like bucket.
 
         Default ENSC meaning:
@@ -455,7 +461,8 @@ class SpecializationRequirementResolver:
             .tolist()
         )
 
-    def get_complementary_studies_eligible_course_codes(self) -> list"""
+    def get_complementary_studies_eligible_course_codes(self) -> list:
+        """
         Return eligible courses for complementary bucket.
         """
 
@@ -613,7 +620,8 @@ class SpecializationRequirementResolver:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def split_semicolon(value) -> listif value is None:
+    def split_semicolon(value) -> list:
+        if value is None:
             return []
 
         return [
@@ -686,3 +694,26 @@ class SpecializationRequirementResolver:
                     self.requirement_courses[column],
                     errors="coerce",
                 )
+                
+
+    @staticmethod
+    def join_group_ids(groups: pd.DataFrame) -> str:
+        """
+        Join unique group_id values from a dataframe into a semicolon-separated string.
+    
+        Used for notes/source tracing in auditors.
+        """
+    
+        if groups is None or groups.empty:
+            return ""
+    
+        if "group_id" not in groups.columns:
+            return ""
+    
+        return ";".join(
+            groups["group_id"]
+            .dropna()
+            .astype(str)
+            .drop_duplicates()
+            .tolist()
+        )
