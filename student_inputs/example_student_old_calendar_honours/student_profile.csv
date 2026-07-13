@@ -1,0 +1,12 @@
+field,value,notes
+case_id,example_student_old_calendar_honours,Synthetic fourth-year Honours case for old-calendar testing
+calendar_year,2024-2025,Edit if your old curriculum folder uses a different calendar year
+program,ENSC,Program code
+program_type,Honours,Honours test case
+option_id,ECOLOGY_CONSERVATION,Selected Area of Concentration / option ID
+academic_year,4,Fourth-year student; promotion target may be beyond configured promotion rules
+start_date,2021-09-01,Approximate program start date
+promotion_target_year,4,Optional; current AuditEngine may instead use academic_year + 1
+has_biology_12,TRUE,Optional lower-level/foundational context
+has_chemistry_12,TRUE,Optional lower-level/foundational context
+has_physics_12,TRUE,Optional lower-level/foundational context

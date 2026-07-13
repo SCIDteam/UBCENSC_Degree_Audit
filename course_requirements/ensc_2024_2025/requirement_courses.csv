@@ -1,7 +1,7 @@
 group_id,program,calendar_year,program_type,year_level,requirement_area,option_id,option_name,option_name_raw,theme,is_recommended,label,credits,rule_type,rule_value,rule_subject,include_pattern,exclude_pattern,rule_unit,course_code,source_text
 ENSC_2024_2025_MAJOR_001,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,BIOL_V 121 1,3.0,required_course,,,,,,BIOL121,BIOL_V 121 1
-ENSC_2024_2025_MAJOR_002,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,required_all,,,,,,BIOL140,BIOL_V 180 (or 140) 1
-ENSC_2024_2025_MAJOR_002,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,required_all,,,,,,BIOL180,BIOL_V 180 (or 140) 1
+ENSC_2024_2025_MAJOR_002,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,choose_n,1,,,,,BIOL140,BIOL_V 180 (or 140) 1
+ENSC_2024_2025_MAJOR_002,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,choose_n,1,,,,,BIOL180,BIOL_V 180 (or 140) 1
 ENSC_2024_2025_MAJOR_003,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,CHEM_V 121 (or 111 or 141) 2,4.0,choose_n,1,,,,,CHEM111,CHEM_V 121 (or 111 or 141) 2
 ENSC_2024_2025_MAJOR_003,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,CHEM_V 121 (or 111 or 141) 2,4.0,choose_n,1,,,,,CHEM121,CHEM_V 121 (or 111 or 141) 2
 ENSC_2024_2025_MAJOR_003,ENSC,2024-2025,Major,First Year,Core Requirement,,,,,False,CHEM_V 121 (or 111 or 141) 2,4.0,choose_n,1,,,,,CHEM141,CHEM_V 121 (or 111 or 141) 2
@@ -56,8 +56,8 @@ ENSC_2024_2025_MAJOR_024,ENSC,2024-2025,Major,Third and Fourth Years,Tools Elect
 ENSC_2024_2025_MAJOR_024,ENSC,2024-2025,Major,Third and Fourth Years,Tools Elective,,,,,False,'Tools' Elective 11,3.0,choose_n,1,,,,,GEOS373,"'Tools' Elective 11 | Footnote 11: ‘Tools’ Elective: One of ATSC_V 303, CHEM_V 311 (requires CHEM_V 211), CONS_V 340, EOSC_V 211, FRST_V 443, GEOS_V (or GEOB_V) 270, 309, 370, 373, or ISCI_V 422. Must be completed before fourth year."
 ENSC_2024_2025_MAJOR_024,ENSC,2024-2025,Major,Third and Fourth Years,Tools Elective,,,,,False,'Tools' Elective 11,3.0,choose_n,1,,,,,ISCI422,"'Tools' Elective 11 | Footnote 11: ‘Tools’ Elective: One of ATSC_V 303, CHEM_V 311 (requires CHEM_V 211), CONS_V 340, EOSC_V 211, FRST_V 443, GEOS_V (or GEOB_V) 270, 309, 370, 373, or ISCI_V 422. Must be completed before fourth year."
 ENSC_2024_2025_HONOURS_001,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,BIOL_V 121 1,3.0,required_course,,,,,,BIOL121,BIOL_V 121 1
-ENSC_2024_2025_HONOURS_002,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,required_all,,,,,,BIOL140,BIOL_V 180 (or 140) 1
-ENSC_2024_2025_HONOURS_002,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,required_all,,,,,,BIOL180,BIOL_V 180 (or 140) 1
+ENSC_2024_2025_HONOURS_002,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,choose_n,1,,,,,BIOL140,BIOL_V 180 (or 140) 1
+ENSC_2024_2025_HONOURS_002,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,BIOL_V 180 (or 140) 1,2.0,choose_n,1,,,,,BIOL180,BIOL_V 180 (or 140) 1
 ENSC_2024_2025_HONOURS_003,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,CHEM_V 121 (or 111 or 141) 2,4.0,choose_n,1,,,,,CHEM111,CHEM_V 121 (or 111 or 141) 2
 ENSC_2024_2025_HONOURS_003,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,CHEM_V 121 (or 111 or 141) 2,4.0,choose_n,1,,,,,CHEM121,CHEM_V 121 (or 111 or 141) 2
 ENSC_2024_2025_HONOURS_003,ENSC,2024-2025,Honours,First Year,Core Requirement,,,,,False,CHEM_V 121 (or 111 or 141) 2,4.0,choose_n,1,,,,,CHEM141,CHEM_V 121 (or 111 or 141) 2
