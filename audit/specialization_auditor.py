@@ -648,8 +648,13 @@ class SpecializationAuditor:
         requirement_area = str(group.get("requirement_area", "")).strip()
         
         
-        if requirement_area == "Tools Elective":
-                return True
+        if requirement_area in {
+            "Credit Total",
+            "Degree Minimum",
+            "Faculty Requirement",
+            "Communication Requirement",
+        }:
+            return True
 
 
         skip_rule_types = {

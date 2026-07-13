@@ -165,16 +165,18 @@ Current Limitations
 - More test cases are needed, especially for Honours, transfer credits, substitutions, overrides, and double-counting.
 - Faculty and specialization rules should be reviewed against the official calendar before use.
 
+Next Steps
+----------------------
+1. Build a front-end web app for students & advisor degree planning
+2. Check course pre-requisites to ensure plan feasibility
+3. Add automated tests for loaders, course classification, Faculty audit, specialization audit, promotion audit, and allocation.
+4. Add more representative student test cases.
+5. Improve allocation edge-case handling and consider an optimizer for complex conflicts.
+6. Refine allocated theme-minimum logic.
+7. Add an overall audit summary CSV.
+8. Continue improving scraper filtering for advising or policy text that should not create course requirements.
+9. Review Faculty and specialization rule files against official calendar requirements.
+
 AI Disclosure
 -------------
 Portions of the code in this repository were generated or revised with assistance from Microsoft 365 Copilot. This README was also generated with assistance from Microsoft 365 Copilot, following common README best practices for project overview, setup context, architecture summary, limitations, and usage notes.
-
-Recommended Next Steps
-----------------------
-1. Add automated tests for loaders, course classification, Faculty audit, specialization audit, promotion audit, and allocation.
-2. Add more representative student test cases.
-3. Improve allocation edge-case handling and consider an optimizer for complex conflicts.
-4. Refine allocated theme-minimum logic.
-5. Add an overall audit summary CSV.
-6. Continue improving scraper filtering for advising or policy text that should not create course requirements.
-7. Review Faculty and specialization rule files against official calendar requirements.

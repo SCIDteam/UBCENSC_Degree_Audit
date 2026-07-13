@@ -455,10 +455,16 @@ class AuditEngine:
         target_year = self._promotion_target_year()
 
         if target_year is None:
-            print("Promotion")
-            print("---------")
-            print("Promotion target is unknown because academic_year is missing.")
-            print()
+            if self.bundle.profile.academic_year == 4:
+                print("Promotion")
+                print("---------")
+                print("Student in final year. Check graduation requirements.")
+                print()
+            else:
+                print("Promotion")
+                print("---------")
+                print("Promotion target is unknown because academic_year is missing.")
+                print()
             return
 
         print(f"Promotion to Year {target_year}")
@@ -795,6 +801,9 @@ class AuditEngine:
         academic_year = self.bundle.profile.academic_year
 
         if academic_year is None:
+            return None
+        
+        if academic_year == 4:
             return None
 
         return int(academic_year) + 1

@@ -1067,6 +1067,16 @@ class CalendarParser:
 
         if len(courses) == 1:
             return "required_course", None
+        
+        # Choice patterns, including parenthetical alternatives:
+        # BIOL_V 180 (or 140)
+        # CHEM_V 121 (or 111 or 141)
+        # MATH_V 100 or 102 or 104
+        if (
+            re.search(r"\bor\b", lower)
+            and len(courses) > 1
+        ):
+            return "choose_n", 1
 
         if len(courses) > 1:
             return "required_all", None

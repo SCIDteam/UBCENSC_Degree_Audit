@@ -14,7 +14,7 @@ from audit.models import AuditOptions
 from audit.audit_engine import AuditEngine
 
 import pdb
-pdb.set_trace()
+#pdb.set_trace()
 
 # ---------------------------------------------------------------------
 # Runtime setup
@@ -22,9 +22,11 @@ pdb.set_trace()
 
 #student_case_dir = "student_inputs/example_student_001"
 #student_case_dir = "student_inputs/example_student_honours_land_air_water"
-student_case_dir = "student_inputs/example_student_002"
+student_case_dir = "student_inputs/example_student_003"
+#student_case_dir ="student_inputs/example_student_old_calendar_honours"
+#student_case_dir ="student_inputs/example_student_old_calendar_major"
 count_statuses = []
-audit_mode = 'in-progress' #'planned' #'planned'
+audit_mode = 'planned' #'in-progress' #'planned' #
 write_outputs = False
 print_outputs = True
 

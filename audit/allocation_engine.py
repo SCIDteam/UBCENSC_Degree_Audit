@@ -330,7 +330,7 @@ class AllocationEngine:
                     override_group_id,
                 )
 
-                bucket = self.resolver.bucket_for_row_dict(group_info)
+                bucket = self.resolver.bucket_for_row(group_info)
 
                 display_area = group_info.get(
                     "requirement_area",
@@ -684,40 +684,107 @@ class AllocationEngine:
         course_allocation: pd.DataFrame,
         bucket: str,
     ) -> dict:
+        """
+        Recalculate a specific specialization requirement after allocation.
+    
+        Important behavior:
+        - Explicit override_exclusive_group_id assignments count before course-list
+          eligibility filtering.
+        - Non-overridden allocated courses still need to match the formal eligible list.
+        - Double-count group overrides also count.
+        """
+    
         group_id = str(audit_row.get("group_id", "")).strip()
         unit = str(audit_row.get("unit", "")).strip()
         required = float(audit_row.get("required", 0))
-
-        matched = course_allocation[
-            self._allocation_counts_for_specific_group(
-                course_allocation=course_allocation,
-                group_id=group_id,
+    
+        if not group_id:
+            return self._make_allocated_row(
+                audit_row=audit_row,
+                completed=0,
+                required=required,
+                unit=unit,
+                allocated_courses="",
+                notes="No group_id available for post-allocation recalculation.",
+            )
+    
+        eligible_courses = self.resolver.get_group_course_codes(group_id)
+    
+        # 1. Courses explicitly assigned to this exact group.
+        exact_group_match = course_allocation[
+            course_allocation["exclusive_group_id"]
+            .astype(str)
+            .str.strip()
+            == group_id
+        ].copy()
+    
+        # 2. Courses allowed to double-count to this exact group.
+        double_group_match = course_allocation[
+            course_allocation.apply(
+                lambda row: self._double_count_matches_group(row, group_id),
+                axis=1,
             )
         ].copy()
-
-        eligible_courses = self.resolver.get_group_course_codes(group_id)
-
+    
+        # 3. Courses assigned to the relevant bucket, but not directly to this group.
+        # These must still pass formal eligibility filtering.
+        bucket_match = course_allocation[
+            (
+                course_allocation["exclusive_bucket"]
+                .astype(str)
+                .str.strip()
+                == bucket
+            )
+            &
+            (
+                course_allocation["exclusive_group_id"]
+                .astype(str)
+                .str.strip()
+                != group_id
+            )
+        ].copy()
+    
         if eligible_courses:
-            matched = self.resolver.filter_courses_by_eligible_codes(
-                matched,
+            bucket_match = self.resolver.filter_courses_by_eligible_codes(
+                bucket_match,
                 eligible_courses,
             )
-
+    
+        matched = pd.concat(
+            [
+                exact_group_match,
+                double_group_match,
+                bucket_match,
+            ],
+            ignore_index=True,
+        ).drop_duplicates(
+            subset=["effective_course_code"]
+        )
+    
         if unit == "credits":
             completed = matched["credits"].sum()
         else:
             completed = min(
-                matched["effective_course_code"].drop_duplicates().shape[0],
+                matched["effective_course_code"]
+                .dropna()
+                .astype(str)
+                .drop_duplicates()
+                .shape[0],
                 required,
             )
-
+    
+        notes = (
+            "Post-allocation recalculation for specific requirement group. "
+            "Explicit group overrides are counted before formal eligibility filtering."
+        )
+    
         return self._make_allocated_row(
             audit_row=audit_row,
             completed=completed,
             required=required,
             unit=unit,
             allocated_courses=self._course_list(matched),
-            notes="Post-allocation recalculation for specific requirement group.",
+            notes=notes,
         )
 
     def _allocated_theme_minimum_row(
@@ -1271,21 +1338,61 @@ class AllocationEngine:
             if group.strip()
         ]
 
-    @staticmethod
     def _double_count_matches_bucket(
+        self,
         row,
         bucket: str,
     ) -> bool:
+        """
+        Return True if a course is approved to double-count toward a bucket.
+    
+        Supports two override styles:
+    
+        1. Direct bucket override:
+           override_double_count_groups = option
+    
+        2. Specific group override:
+           override_double_count_groups = ENSC_..._AOC_...
+    
+           If the listed group belongs to the requested bucket, the course also
+           counts toward the bucket total.
+        """
+    
         if not bool(row.get("double_count_allowed", False)):
             return False
-
-        groups = str(row.get("double_count_groups", "")).split(";")
-
-        return bucket in [
-            group.strip()
-            for group in groups
-            if group.strip()
+    
+        tokens = [
+            token.strip()
+            for token in str(row.get("double_count_groups", "")).split(";")
+            if token.strip()
         ]
+    
+        if not tokens:
+            return False
+    
+        # Direct bucket name match, e.g. "option".
+        if bucket in tokens:
+            return True
+    
+        # Display-name match also allowed, e.g. "Area of Concentration".
+        bucket_display_name = self.resolver.display_name_for_bucket(bucket)
+    
+        if bucket_display_name in tokens:
+            return True
+    
+        # If a listed token is a group_id, infer that group's bucket.
+        for token in tokens:
+            group_metadata = self.resolver.get_group_metadata(token)
+    
+            if not group_metadata:
+                continue
+    
+            token_bucket = self.resolver.bucket_for_row(group_metadata)
+    
+            if token_bucket == bucket:
+                return True
+    
+        return False
 
     # ------------------------------------------------------------------
     # Small helpers

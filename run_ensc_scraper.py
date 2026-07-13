@@ -8,7 +8,7 @@ import pdb
 from scrape_calendar import run_scraper
 import pandas as pd
 
-#pdb.set_trace()
+pdb.set_trace()
 
 calyr="2024-2025" #"2026-2027" #"2024-2025" #
 if calyr == "2024-2025":

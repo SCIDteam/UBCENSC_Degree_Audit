@@ -1,6 +1,6 @@
 ﻿requirement_id,requirement_area,program,calendar_year,program_type,course_code,credits,rule_type,notes
 COMMUNICATION,Communication Requirement,ALL,ALL,ALL,SCIE113,3,required_course,First-year communication requirement
-COMMUNICATION,Communication Requirement,ENSC,2026-2027,ALL,ENVR200,3,eligible_course,Additional Communication Requirement
+COMMUNICATION,Communication Requirement,ENSC,ALL,ALL,ENVR200,3,eligible_course,Additional Communication Requirement
 COMMUNICATION,Communication Requirement,ALL,ALL,ALL,WRDS150,3,eligible_course,Additional Communication Requirement
 COMMUNICATION,Communication Requirement,ALL,ALL,ALL,ENGL110,3,eligible_course,Additional Communication Requirement
 COMMUNICATION,Communication Requirement,ALL,ALL,ALL,ENGL111,3,eligible_course,Additional Communication Requirement
