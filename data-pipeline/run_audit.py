@@ -27,7 +27,7 @@ student_case_dir = "student_inputs/example_student_003"
 #student_case_dir ="student_inputs/example_student_old_calendar_major"
 count_statuses = []
 audit_mode = 'planned' #'in-progress' #'planned' #
-write_outputs = False
+write_outputs = True
 print_outputs = True
 
 if audit_mode == 'planned':
