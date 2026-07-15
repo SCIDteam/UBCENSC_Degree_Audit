@@ -5,7 +5,7 @@ Created on Thu Jul  2 12:37:56 2026
 @author: Timot
 """
 import pdb
-from scrape_calendar import run_scraper
+from student_inputs.scrape_calendar import run_scraper
 
 
 url = "https://vancouver.calendar.ubc.ca/faculties-colleges-and-schools/faculty-science/bachelor-science/environmental-sciences"
