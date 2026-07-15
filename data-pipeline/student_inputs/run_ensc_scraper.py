@@ -7,6 +7,7 @@ Created on Thu Jul  2 12:37:56 2026
 import pdb
 from student_inputs.scrape_calendar import run_scraper
 import pandas as pd
+import os
 
 pdb.set_trace()
 
@@ -27,7 +28,7 @@ package = run_scraper(
     output_dir=output_dir,
     complementary_url = complementary_studies_url)
 
-df_courses = pd.read_csv(output_dir+'/requirement_courses.csv')
-df_groups = pd.read_csv(output_dir+'/requirement_groups.csv')
+df_courses = pd.read_csv(os.path.join(output_dir, '/requirement_courses.csv'))
+df_groups = pd.read_csv(os.path.join(output_dir, '/requirement_groups.csv'))
 
 print(package)
