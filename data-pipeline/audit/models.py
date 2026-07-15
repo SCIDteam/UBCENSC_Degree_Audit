@@ -111,6 +111,7 @@ class AuditWorkingData:
     specialization_audit: pd.DataFrame | None = None
     course_allocation: pd.DataFrame | None = None
     promotion_audit: pd.DataFrame | None = None
+    allocated_specialization_audit: pd.DataFrame | None = None
 
 @dataclass
 class AllocationConfig:
