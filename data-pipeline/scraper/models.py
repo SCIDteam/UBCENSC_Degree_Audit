@@ -19,13 +19,13 @@ class Concentration:
     name: str
     courses: list[str] = field(default_factory=list)
 
-@dataclass
-class RequirementPackage:
-    program: str
-    calendar_year: str
+# @dataclass
+# class RequirementPackage:
+#     program: str
+#     calendar_year: str
 
-    requirements: list[Requirement] = field(default_factory=list)
-    concentrations: list[Concentration] = field(default_factory=list)
+#     requirements: list[Requirement] = field(default_factory=list)
+#     concentrations: list[Concentration] = field(default_factory=list)
 
 @dataclass
 class ProgramBlock:
