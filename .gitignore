@@ -1,1 +1,3 @@
 student_inputs/transcripts/*
+__pycache__/
+output/
