@@ -1166,7 +1166,7 @@ class AllocationEngine:
         df.at[idx, "exclusive_label"] = label
         df.at[idx, "exclusive_rule_type"] = rule_type
         df.at[idx, "exclusive_bucket"] = bucket
-        df.at[idx, "allocation_priority"] = priority
+        df.at[idx, "allocation_priority"] = str(priority)
         df.at[idx, "allocation_method"] = method
         df.at[idx, "allocation_notes"] = notes
 
