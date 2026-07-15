@@ -28,7 +28,7 @@ package = run_scraper(
     output_dir=output_dir,
     complementary_url = complementary_studies_url)
 
-df_courses = pd.read_csv(os.path.join(output_dir, '/requirement_courses.csv'))
-df_groups = pd.read_csv(os.path.join(output_dir, '/requirement_groups.csv'))
+df_courses = pd.read_csv(os.path.join(output_dir, 'requirement_courses.csv'))
+df_groups = pd.read_csv(os.path.join(output_dir, 'requirement_groups.csv'))
 
 print(package)
