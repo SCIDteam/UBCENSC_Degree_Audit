@@ -126,7 +126,7 @@ class AllocationEngine:
 
         allocation.loc[~counted_mask, "allocation_method"] = "not_counted_status"
         allocation.loc[~counted_mask, "allocation_notes"] = (
-            "Course status not included in current audit options."
+            "Course excluded because status, letter grade, or percentage grade is not countable."
         )
 
         allocation = self._add_allocation_sort_columns(allocation)
@@ -179,7 +179,9 @@ class AllocationEngine:
                 )
 
         allocation["also_counts_toward"] = allocation.apply(
-            self._also_counts_toward,
+            lambda row: self._also_counts_toward(row)
+            if self._is_counted_row(row)
+            else "",
             axis=1,
         )
 
@@ -1184,20 +1186,29 @@ class AllocationEngine:
         row,
     ) -> bool:
         status = str(row.get("status", "")).strip().lower()
-
+    
         count_statuses = {
             status.strip().lower()
             for status in self.options.count_statuses
         }
-
+    
         excluded_statuses = {
             "failed",
             "withdrawn",
             "w",
             "fail",
         }
-
-        return status in count_statuses and status not in excluded_statuses
+    
+        if status not in count_statuses:
+            return False
+    
+        if status in excluded_statuses:
+            return False
+    
+        if self._has_failed_or_withdrawn_grade(row):
+            return False
+    
+        return True
 
     def _counted_course_mask(
         self,
@@ -1207,17 +1218,24 @@ class AllocationEngine:
             status.strip().lower()
             for status in self.options.count_statuses
         }
-
+    
         excluded = {
             "failed",
             "withdrawn",
             "w",
             "fail",
         }
-
-        normalized = df["status"].astype(str).str.strip().str.lower()
-
-        return normalized.isin(statuses) & ~normalized.isin(excluded)
+    
+        normalized_status = df["status"].astype(str).str.strip().str.lower()
+    
+        status_mask = normalized_status.isin(statuses) & ~normalized_status.isin(excluded)
+    
+        grade_mask = df.apply(
+            lambda row: not self._has_failed_or_withdrawn_grade(row),
+            axis=1,
+        )
+    
+        return status_mask & grade_mask
 
     def _add_allocation_sort_columns(
         self,
@@ -1425,3 +1443,29 @@ class AllocationEngine:
             .drop_duplicates()
             .tolist()
         )
+    @staticmethod
+    def _has_failed_or_withdrawn_grade(row) -> bool:
+        """
+        Return True if the course should be excluded because it has:
+        - letter grade F
+        - letter grade W
+        - percentage grade < 50
+    
+        Missing grades are not treated as failed/withdrawn, because planned or
+        in-progress courses may not have grades yet.
+        """
+    
+        letter_grade = str(row.get("grade", "")).strip().upper()
+    
+        if letter_grade in {"F", "W"}:
+            return True
+    
+        percentage_grade = row.get("percentage", None)
+    
+        if percentage_grade is None or pd.isna(percentage_grade):
+            return False
+    
+        try:
+            return float(percentage_grade) < 50
+        except (TypeError, ValueError):
+            return False
