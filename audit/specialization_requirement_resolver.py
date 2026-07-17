@@ -446,10 +446,11 @@ class SpecializationRequirementResolver:
                 | (rows["program_type_normalized"] == "ALL")
                 | (rows["program_type_normalized"] == "")
             )
-            &
-            (
-                rows["is_recommended"].astype(str).str.lower() != "true"
-            )
+            #2026-07-17 - recommended courses should be included, so cut this logic.
+            # &
+            # (
+            #     rows["is_recommended"].astype(str).str.lower() != "true"
+            # )
         ].copy()
 
         return (
