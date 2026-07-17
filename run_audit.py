@@ -22,9 +22,9 @@ import pdb
 
 #student_case_dir = "student_inputs/example_student_001"
 #student_case_dir = "student_inputs/example_student_honours_land_air_water"
-student_case_dir = "student_inputs/example_student_003"
+#student_case_dir = "student_inputs/example_student_003"
 #student_case_dir ="student_inputs/example_student_old_calendar_honours"
-#student_case_dir ="student_inputs/example_student_old_calendar_major"
+student_case_dir ="student_inputs/example_student_old_calendar_major_2"
 count_statuses = []
 audit_mode = 'planned' #'in-progress' #'planned' #
 write_outputs = False
