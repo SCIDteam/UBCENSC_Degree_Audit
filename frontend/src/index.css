@@ -15,6 +15,9 @@
   --border: #e1e4e9;
   --input: #e1e4e9;
   --ring: #0f1a3c;
+  --accent: #e4e9f2;
+  --accent-foreground: #0f1a3c;
+  --destructive: #dc2626;
   --radius: 0.5rem;
 
   --font-heading: 'Libre Franklin', system-ui, sans-serif;
@@ -37,6 +40,9 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
 
   --radius-sm: calc(var(--radius) - 0.25rem);
   --radius-md: calc(var(--radius) - 0.125rem);
