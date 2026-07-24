@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Search } from 'lucide-react'
 import type { CatalogueCourse } from '../../types/courseCatalogue'
+
+export type CourseSearchPanelHandle = {
+  focusInput: () => void
+  focusLastResult: () => void
+}
 
 type LoadState =
   | { status: 'loading' }
@@ -36,12 +41,12 @@ function CourseResult({
   onSelect,
 }: {
   course: CatalogueCourse
-  onSelect: (course: CatalogueCourse) => void
+  onSelect: (course: CatalogueCourse, element: HTMLButtonElement) => void
 }) {
   return (
     <button
       type="button"
-      onClick={() => onSelect(course)}
+      onClick={(e) => onSelect(course, e.currentTarget)}
       className="flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
     >
       <div className="flex items-center gap-1.5">
@@ -60,13 +65,24 @@ function CourseResult({
   )
 }
 
-export default function CourseSearchPanel({
-  onSelectCourse,
-}: {
-  onSelectCourse: (course: CatalogueCourse) => void
-}) {
+const CourseSearchPanel = forwardRef<
+  CourseSearchPanelHandle,
+  { onSelectCourse: (course: CatalogueCourse) => void }
+>(function CourseSearchPanel({ onSelectCourse }, ref) {
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const lastResultRef = useRef<HTMLButtonElement | null>(null)
+
+  useImperativeHandle(ref, () => ({
+    focusInput: () => inputRef.current?.focus(),
+    focusLastResult: () => lastResultRef.current?.focus(),
+  }))
+
+  const handleResultSelect = (course: CatalogueCourse, element: HTMLButtonElement) => {
+    lastResultRef.current = element
+    onSelectCourse(course)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -116,6 +132,7 @@ export default function CourseSearchPanel({
             className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
           <input
+            ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -162,11 +179,17 @@ export default function CourseSearchPanel({
         {loadState.status === 'ready' && normalizedQuery && results.length > 0 && (
           <div className="space-y-0.5">
             {results.map((course) => (
-              <CourseResult key={course.course_code} course={course} onSelect={onSelectCourse} />
+              <CourseResult
+                key={course.course_code}
+                course={course}
+                onSelect={handleResultSelect}
+              />
             ))}
           </div>
         )}
       </div>
     </div>
   )
-}
+})
+
+export default CourseSearchPanel
