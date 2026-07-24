@@ -15,7 +15,6 @@ export interface StudentSetupProfile {
   program_type: ProgramType | ''
   option_id: OptionId | ''
   academic_year: AcademicYearValue | ''
-  start_date: string
 }
 
 export const emptyStudentSetupProfile: StudentSetupProfile = {
@@ -24,5 +23,4 @@ export const emptyStudentSetupProfile: StudentSetupProfile = {
   program_type: '',
   option_id: '',
   academic_year: '',
-  start_date: '',
 }

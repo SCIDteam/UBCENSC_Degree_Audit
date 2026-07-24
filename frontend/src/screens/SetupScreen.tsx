@@ -11,7 +11,7 @@ import {
 import {
   academicYears,
   calendarYears,
-  concentrations,
+  concentrationsByCalendarYear,
   programTypes,
   programs,
 } from '../data/setupOptions'
@@ -86,52 +86,6 @@ function FormSelect({
     </div>
   )
 }
-/* date saved as string in YYYY-MM-DD format to match the HTML date input value format */
-function FormDateInput({ 
-  id,
-  label,
-  value,
-  onChange,
-  error,
-  required,
-}: {
-  id: string
-  label: string
-  value: string
-  onChange: (value: string) => void
-  error?: string
-  required?: boolean
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-semibold text-foreground">
-        {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
-      </label>
-      <input
-        id={id}
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={[
-          'w-full rounded-md border bg-card px-3 py-2.5 font-body text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1',
-          error
-            ? 'border-destructive bg-red-50'
-            : value
-              ? 'border-border text-foreground'
-              : 'border-border text-muted-foreground',
-        ].join(' ')}
-      />
-      {error && (
-        <p className="flex items-start gap-1.5 text-xs text-destructive">
-          <AlertCircle size={12} className="mt-0.5 flex-shrink-0" />
-          {error}
-        </p>
-      )}
-    </div>
-  )
-}
-
 function SegmentedControl({
   label,
   options,
@@ -330,10 +284,6 @@ const programOptions: Option[] = programs.map((program) => ({
   value: program.code,
   label: program.name,
 }))
-const concentrationOptions: Option[] = concentrations.map((concentration) => ({
-  value: concentration.optionId,
-  label: concentration.name,
-}))
 const programTypeOptions: Option[] = programTypes.map((type) => ({ value: type, label: type }))
 const academicYearOptions: Option[] = academicYears.map((year) => ({
   value: String(year.value),
@@ -341,7 +291,15 @@ const academicYearOptions: Option[] = academicYears.map((year) => ({
 }))
 const calendarYearOptions: Option[] = calendarYears.map((year) => ({ value: year, label: year }))
 
-const REQUIRED_FIELD_COUNT = 6
+function getConcentrationOptions(calendarYear: StudentSetupProfile['calendar_year']): Option[] {
+  if (!calendarYear) return []
+  return concentrationsByCalendarYear[calendarYear].map((concentration) => ({
+    value: concentration.optionId,
+    label: concentration.name,
+  }))
+}
+
+const REQUIRED_FIELD_COUNT = 5
 
 function isProfileComplete(profile: StudentSetupProfile) {
   return (
@@ -349,8 +307,7 @@ function isProfileComplete(profile: StudentSetupProfile) {
     !!profile.program &&
     !!profile.program_type &&
     !!profile.option_id &&
-    !!profile.academic_year &&
-    !!profile.start_date
+    !!profile.academic_year
   )
 }
 
@@ -367,11 +324,25 @@ export default function SetupScreen({
   const [touched, setTouched] = useState({
     calendar_year: false,
     option_id: false,
-    start_date: false,
   })
 
   const set = <K extends keyof StudentSetupProfile>(key: K, value: StudentSetupProfile[K]) =>
     setProfile((prev) => ({ ...prev, [key]: value }))
+
+  const concentrationOptions = getConcentrationOptions(profile.calendar_year)
+
+  const handleCalendarYearChange = (value: string) => {
+    const nextCalendarYear = value as StudentSetupProfile['calendar_year']
+    const validOptionIds: string[] = nextCalendarYear
+      ? concentrationsByCalendarYear[nextCalendarYear].map((concentration) => concentration.optionId)
+      : []
+    setProfile((prev) => ({
+      ...prev,
+      calendar_year: nextCalendarYear,
+      option_id: validOptionIds.includes(prev.option_id) ? prev.option_id : '',
+    }))
+    setTouched((prev) => ({ ...prev, calendar_year: true }))
+  }
 
   const complete = isProfileComplete(profile)
   const completedCount = [
@@ -380,7 +351,6 @@ export default function SetupScreen({
     profile.program_type,
     profile.option_id,
     profile.academic_year,
-    profile.start_date,
   ].filter(Boolean).length
 
   return (
@@ -427,10 +397,7 @@ export default function SetupScreen({
                   value={profile.calendar_year}
                   options={calendarYearOptions}
                   placeholder="Select calendar year…"
-                  onChange={(value) => {
-                    set('calendar_year', value as StudentSetupProfile['calendar_year'])
-                    setTouched((prev) => ({ ...prev, calendar_year: true }))
-                  }}
+                  onChange={handleCalendarYearChange}
                   error={
                     touched.calendar_year && !profile.calendar_year
                       ? 'Please select a calendar year.'
@@ -445,24 +412,6 @@ export default function SetupScreen({
                   options={programOptions}
                   placeholder="Select program…"
                   onChange={(value) => set('program', value as StudentSetupProfile['program'])}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <FormDateInput
-                  id="start-date"
-                  label="Approximate Program Start Date"
-                  value={profile.start_date}
-                  onChange={(value) => {
-                    set('start_date', value)
-                    setTouched((prev) => ({ ...prev, start_date: true }))
-                  }}
-                  error={
-                    touched.start_date && !profile.start_date
-                      ? 'Please enter an approximate start date.'
-                      : undefined
-                  }
                   required
                 />
               </div>
@@ -525,7 +474,7 @@ export default function SetupScreen({
                   type="button"
                   disabled={!complete}
                   onClick={() => {
-                    setTouched({ calendar_year: true, option_id: true, start_date: true })
+                    setTouched({ calendar_year: true, option_id: true })
                     if (complete) onComplete?.(profile)
                   }}
                   className={[
