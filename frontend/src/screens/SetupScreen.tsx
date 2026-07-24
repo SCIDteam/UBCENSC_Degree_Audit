@@ -355,11 +355,15 @@ function isProfileComplete(profile: StudentSetupProfile) {
 }
 
 export default function SetupScreen({
+  initialProfile,
   onComplete,
 }: {
+  initialProfile?: StudentSetupProfile
   onComplete?: (profile: StudentSetupProfile) => void
 }) {
-  const [profile, setProfile] = useState<StudentSetupProfile>(emptyStudentSetupProfile)
+  const [profile, setProfile] = useState<StudentSetupProfile>(
+    initialProfile ?? emptyStudentSetupProfile,
+  )
   const [touched, setTouched] = useState({
     calendar_year: false,
     option_id: false,
