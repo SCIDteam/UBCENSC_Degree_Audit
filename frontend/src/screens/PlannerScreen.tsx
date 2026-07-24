@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { BookOpen, ChevronDown, ChevronRight, Plus, Search } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { academicYears, concentrations, programs } from '../data/setupOptions'
 import type { StudentSetupProfile } from '../types/studentProfile'
 import type { PlannerTerm, PlannerYear } from '../types/coursePlan'
+import type { CatalogueCourse } from '../types/courseCatalogue'
+import CourseSearchPanel from '../components/planner/CourseSearchPanel'
 
 const PLANNER_SECTIONS: { id: PlannerYear; label: string }[] = [
   { id: 1, label: 'Year 1' },
@@ -103,6 +105,7 @@ export default function PlannerScreen({
   onBack: () => void
 }) {
   const [expanded, setExpanded] = useState<Set<PlannerYear>>(new Set([1]))
+  const [, setSelectedCourse] = useState<CatalogueCourse | null>(null)
 
   const toggleSection = (id: PlannerYear) => {
     setExpanded((prev) => {
@@ -157,31 +160,7 @@ export default function PlannerScreen({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-        <div className="flex w-full flex-shrink-0 flex-col overflow-hidden border-b border-border bg-card lg:w-[272px] lg:border-b-0 lg:border-r">
-          <div className="flex-shrink-0 border-b border-border px-4 py-3">
-            <h2 className="font-heading text-sm font-semibold text-foreground">Add Courses</h2>
-          </div>
-          <div className="flex-shrink-0 px-3 pb-2 pt-3">
-            <div className="relative">
-              <Search
-                size={13}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <input
-                type="text"
-                disabled
-                placeholder="Search by code or title"
-                className="w-full cursor-not-allowed rounded-md border border-border bg-muted py-2 pl-8 pr-3 text-xs text-muted-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-          </div>
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 py-8 text-center">
-            <Search size={22} className="text-muted-foreground/30" />
-            <p className="text-xs text-muted-foreground">
-              Course search will be connected next.
-            </p>
-          </div>
-        </div>
+        <CourseSearchPanel onSelectCourse={setSelectedCourse} />
 
         <main className="min-w-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
           {PLANNER_SECTIONS.map((section) => (
