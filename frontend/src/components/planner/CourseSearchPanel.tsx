@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { AlertCircle, Search } from 'lucide-react'
+import { AlertCircle, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import type { CatalogueCourse } from '../../types/courseCatalogue'
 
 export type CourseSearchPanelHandle = {
@@ -43,25 +43,92 @@ function CourseResult({
   course: CatalogueCourse
   onSelect: (course: CatalogueCourse, element: HTMLButtonElement) => void
 }) {
+  const [showPrerequisite, setShowPrerequisite] = useState(false)
+  const [showCorequisite, setShowCorequisite] = useState(false)
   return (
-    <button
-      type="button"
-      onClick={(e) => onSelect(course, e.currentTarget)}
-      className="flex w-full flex-col gap-0.5 rounded-md px-3 py-2 text-left transition-colors hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-    >
-      <div className="flex items-center gap-1.5">
-        <span className="font-heading text-[11px] font-bold text-foreground">
-          {course.display_code}
+    <div className="border-b border-border px-2 py-1">
+      <button
+        type="button"
+        onClick={(event) => onSelect(course, event.currentTarget)}
+        className="flex w-full flex-col gap-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="font-heading text-[11px] font-bold text-foreground">
+              {course.display_code}
+            </span>
+
+            <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">
+              {course.subject}
+            </span>
+          </div>
+
+          <span className="text-[10px] text-muted-foreground/70">
+            {course.credits} cr
+          </span>
+        </div>
+
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {course.course_title}
+        </p>
+
+        <span className="text-[10px] text-muted-foreground/70">
+          {course.course_level} level
         </span>
-        <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">
-          {course.subject}
-        </span>
-      </div>
-      <p className="text-[11px] leading-snug text-muted-foreground">{course.course_title}</p>
-      <span className="text-[10px] text-muted-foreground/70">
-        {course.credits} cr · {course.course_level}-level
-      </span>
-    </button>
+      </button>
+
+      {(course.prerequisite_text || course.corequisite_text) && (
+        <div className="flex flex-wrap gap-1.5 px-2 pb-2">
+          {course.prerequisite_text && (
+            <button
+              type="button"
+              onClick={() => setShowPrerequisite((current) => !current)}
+              aria-expanded={showPrerequisite}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Prerequisite
+              {showPrerequisite ? (
+                <ChevronUp size={11} />
+              ) : (
+                <ChevronDown size={11} />
+              )}
+            </button>
+          )}
+
+          {course.corequisite_text && (
+            <button
+              type="button"
+              onClick={() => setShowCorequisite((current) => !current)}
+              aria-expanded={showCorequisite}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Corequisite
+              {showCorequisite ? (
+                <ChevronUp size={11} />
+              ) : (
+                <ChevronDown size={11} />
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
+      {showPrerequisite && (
+        <div className="mx-2 mb-2 rounded-md border border-border bg-muted/30 px-2 py-2">
+          <p className="text-[10px] leading-4 text-muted-foreground">
+            {course.prerequisite_text}
+          </p>
+        </div>
+      )}
+
+      {showCorequisite && (
+        <div className="mx-2 mb-2 rounded-md border border-border bg-muted/30 px-2 py-2">
+          <p className="text-[10px] leading-4 text-muted-foreground">
+            {course.corequisite_text}
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
 
