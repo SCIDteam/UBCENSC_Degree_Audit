@@ -1,0 +1,569 @@
+{
+    "schema_version": 1,
+    "programs": [
+        {
+            "calendar_year": "2024-2025",
+            "program_type": "Major",
+            "general_courses": [
+                {
+                    "course_code": "BIOL121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "ENVR100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "CHEM121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "SCIE113",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "DSCI100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH101",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "ENVR200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR205",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR240",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "EOSC340",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "STAT200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR300",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR305",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR350",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "EOSC345",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR400",
+                    "year_taken": 4
+                },
+                {
+                    "course_code": "ENVR450",
+                    "year_taken": 4
+                }
+            ],
+            "concentrations": {
+                "LAND_AIR_WATER": [
+                    {
+                        "course_code": "CHEM123",
+                        "year_taken": 1
+                    },
+                    {
+                        "course_code": "EOSC211",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR420",
+                        "year_taken": 4
+                    }
+                ],
+                "ECOLOGY_CONSERVATION": [
+                    {
+                        "course_code": "BIOL230",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "CONS200",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR430",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ],
+                "SUSTAINABILITY_SCIENCE": [
+                    {
+                        "course_code": "PHYS333",
+                        "year_taken": 3
+                    },
+                    {
+                        "course_code": "ENVR410",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ]
+            }
+        },
+        {
+            "calendar_year": "2024-2025",
+            "program_type": "Honours",
+            "general_courses": [
+                {
+                    "course_code": "BIOL121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "CHEM121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "CHEM123",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "DSCI100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "ENVR100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH101",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "SCIE113",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "BIOL200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR205",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR240",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "EOSC340",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "STAT200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR300",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR305",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR350",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "EOSC345",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR410",
+                    "year_taken": 4
+                },
+                {
+                    "course_code": "ENVR449",
+                    "year_taken": 4
+                },
+                {
+                    "course_code": "ENVR450",
+                    "year_taken": 4
+                }
+            ],
+            "concentrations": {
+                "LAND_AIR_WATER": [
+                    {
+                        "course_code": "EOSC211",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR420",
+                        "year_taken": 4
+                    }
+                ],
+                "ECOLOGY_CONSERVATION": [
+                    {
+                        "course_code": "BIOL230",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "CONS200",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR430",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ],
+                "SUSTAINABILITY_SCIENCE": [
+                    {
+                        "course_code": "PHYS333",
+                        "year_taken": 3
+                    },
+                    {
+                        "course_code": "ENVR410",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ]
+            }
+        },
+        {
+            "calendar_year": "2026-2027",
+            "program_type": "Major",
+            "general_courses": [
+                {
+                    "course_code": "BIOL121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "ENVR100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "SCIE113",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "CHEM121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH101",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "DSCI100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "ENVR200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR205",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR240",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "STAT200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "EOSC340",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR300",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR305",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR350",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "EOSC345",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR400",
+                    "year_taken": 4
+                },
+                {
+                    "course_code": "ENVR450",
+                    "year_taken": 4
+                }
+            ],
+            "concentrations": {
+                "LAND_AIR_WATER": [
+                    {
+                        "course_code": "CHEM123",
+                        "year_taken": 1
+                    },
+                    {
+                        "course_code": "EOSC211",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR420",
+                        "year_taken": 4
+                    }
+                ],
+                "ECOLOGY_CONSERVATION": [
+                    {
+                        "course_code": "BIOL230",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "CONS200",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR430",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ],
+                "ENERGY_TRANSITIONS_SUSTAINABILITY": [
+                    {
+                        "course_code": "PHYS333",
+                        "year_taken": 3
+                    },
+                    {
+                        "course_code": "ENVR410",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ],
+                "ENVIRONMENTAL_IMPACTS_HUMAN_HEALTH": [
+                    {
+                        "course_code": "CHEM123",
+                        "year_taken": 1
+                    },
+                    {
+                        "course_code": "SPPH303",
+                        "year_taken": 3
+                    }
+                ],
+                "ENVIRONMENTAL_ANALYTICS": [
+                    {
+                        "course_code": "CPSC203",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "EOSC211",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "EOSC410",
+                        "year_taken": 4
+                    }
+                ]
+            }
+        },
+        {
+            "calendar_year": "2026-2027",
+            "program_type": "Honours",
+            "general_courses": [
+                {
+                    "course_code": "BIOL121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "CHEM121",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "CHEM123",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "DSCI100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "ENVR100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH100",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "MATH101",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "SCIE113",
+                    "year_taken": 1
+                },
+                {
+                    "course_code": "BIOL200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR205",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR240",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "EOSC340",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "STAT200",
+                    "year_taken": 2
+                },
+                {
+                    "course_code": "ENVR300",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR305",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR350",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "EOSC345",
+                    "year_taken": 3
+                },
+                {
+                    "course_code": "ENVR449",
+                    "year_taken": 4
+                },
+                {
+                    "course_code": "ENVR450",
+                    "year_taken": 4
+                },
+                {
+                    "course_code": "ENVR410",
+                    "year_taken": 4
+                }
+            ],
+            "concentrations": {
+                "LAND_AIR_WATER": [
+                    {
+                        "course_code": "EOSC211",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR420",
+                        "year_taken": 4
+                    }
+                ],
+                "ECOLOGY_CONSERVATION": [
+                    {
+                        "course_code": "BIOL230",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "CONS200",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "ENVR430",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ],
+                "ENERGY_TRANSITIONS_SUSTAINABILITY": [
+                    {
+                        "course_code": "PHYS333",
+                        "year_taken": 3
+                    },
+                    {
+                        "course_code": "ENVR410",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "ENVR440",
+                        "year_taken": 4
+                    }
+                ],
+                "ENVIRONMENTAL_IMPACTS_HUMAN_HEALTH": [
+                    {
+                        "course_code": "SPPH303",
+                        "year_taken": 3
+                    }
+                ],
+                "ENVIRONMENTAL_ANALYTICS": [
+                    {
+                        "course_code": "CPSC203",
+                        "year_taken": 2
+                    },
+                    {
+                        "course_code": "EOSC410",
+                        "year_taken": 4
+                    },
+                    {
+                        "course_code": "EOSC211",
+                        "year_taken": 2
+                    }
+                ]
+            }
+        }
+    ]
+}

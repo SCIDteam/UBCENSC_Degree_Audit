@@ -20,5 +20,5 @@ export type CourseAttempt = {
   percentage: number | null
   year_taken: PlannerYear
   term_taken: PlannerTerm
-  source: 'manual'
+  source: 'manual' | 'synthetic'
 }
