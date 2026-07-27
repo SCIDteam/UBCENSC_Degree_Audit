@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import type { CatalogueCourse } from '../../types/courseCatalogue'
+import { loadCourseCatalogue } from '../../data/courseCatalogueLoader'
 
 export type CourseSearchPanelHandle = {
   focusInput: () => void
@@ -154,15 +155,10 @@ const CourseSearchPanel = forwardRef<
   useEffect(() => {
     let cancelled = false
 
-    fetch(`${import.meta.env.BASE_URL}data/course-catalogue.json`)
-      .then((response) => {
-        if (!response.ok) throw new Error('Failed to load course catalogue')
-        return response.json()
-      })
-      .then((data) => {
+    loadCourseCatalogue()
+      .then((courses) => {
         if (cancelled) return
-        if (!Array.isArray(data)) throw new Error('Course catalogue is not an array')
-        setLoadState({ status: 'ready', courses: data as CatalogueCourse[] })
+        setLoadState({ status: 'ready', courses })
       })
       .catch(() => {
         if (!cancelled) setLoadState({ status: 'error' })
