@@ -1,38 +1,53 @@
 import json
 import os
 import re
+from typing import Any
 
 import pandas as pd
 
 
-def load_excel_file():
+INPUT_FILENAME = "Course-Data-2026-07-22 Summer.xlsx"
+
+TERM_ORDER = {
+    "Winter Term 1": 0,
+    "Winter Term 2": 1,
+    "Summer": 2,
+}
+
+REQUISITE_HEADINGS = (
+    "Prerequisite",
+    "Corequisite",
+    "Pre- or Corequisite",
+    "Equivalency",
+    "Equivalent",
+    "Restriction",
+)
+
+
+def load_excel_file() -> pd.DataFrame | None:
     base_dir = os.path.abspath(os.path.dirname(__file__))
 
-    file1_path = os.path.join(
+    input_path = os.path.join(
         base_dir,
         "data",
-        "Course-Data-2026-07-22 12_18 PDT.xlsx",
+        INPUT_FILENAME,
     )
 
-    # file2_path = os.path.join(
-    #     base_dir,
-    #     "data",
-    #     "Course_Section_Search_-_Central Term 2 and Summer 2025.xlsx",
-    # )
-
     try:
-        file1 = pd.read_excel(file1_path, skiprows=15)
-        # file2 = pd.read_excel(file2_path, skiprows=1)
+        dataframe = pd.read_excel(
+            input_path,
+            skiprows=15,
+        )
 
-        print("Files successfully loaded.")
-        return file1 #, file2
+        print(f"File successfully loaded: {input_path}")
+        return dataframe
 
     except Exception as error:
-        print(f"An error occurred while loading the files: {error}")
-        return None #, None
+        print(f"An error occurred while loading the file: {error}")
+        return None
 
 
-def clean_subject(value):
+def clean_subject(value: Any) -> str:
     if pd.isna(value):
         return ""
 
@@ -44,7 +59,7 @@ def clean_subject(value):
     return subject
 
 
-def clean_course_number(value):
+def clean_course_number(value: Any) -> str:
     if pd.isna(value):
         return ""
 
@@ -59,7 +74,7 @@ def clean_course_number(value):
     return course_number
 
 
-def get_course_level(course_number):
+def get_course_level(course_number: Any) -> int | None:
     match = re.search(r"\d", str(course_number))
 
     if not match:
@@ -68,7 +83,7 @@ def get_course_level(course_number):
     return int(match.group(0)) * 100
 
 
-def parse_credits(value):
+def parse_credits(value: Any) -> int | float | None:
     if pd.isna(value):
         return None
 
@@ -93,10 +108,207 @@ def parse_credits(value):
     return credits
 
 
-def clean_data(df1):
-    # combined_df = pd.concat(
-    #    [df1, df2],
-    #    ignore_index=True,
+def clean_description(value: Any) -> str:
+    if pd.isna(value):
+        return ""
+
+    description = str(value).strip()
+
+    # Collapse repeated whitespace while keeping the original wording.
+    description = re.sub(r"\s+", " ", description)
+
+    return description
+
+
+def extract_requisite_text(
+    description: Any,
+    heading: str,
+) -> str:
+    """
+    Extract a complete requisite clause while retaining its heading.
+
+    Example:
+        Prerequisite: BIOL 112. Corequisite: BIOL 310.
+
+    Prerequisite result:
+        Prerequisite: BIOL 112.
+
+    Corequisite result:
+        Corequisite: BIOL 310.
+    """
+    text = clean_description(description)
+
+    if not text:
+        return ""
+
+    other_headings = [
+        item
+        for item in REQUISITE_HEADINGS
+        if item.lower() != heading.lower()
+    ]
+
+    stop_pattern = "|".join(
+        re.escape(item)
+        for item in other_headings
+    )
+
+    pattern = re.compile(
+        rf"(?P<result>"
+        rf"\b{re.escape(heading)}\s*:"
+        rf".*?"
+        rf")"
+        rf"(?="
+        rf"\s+(?:{stop_pattern})\s*:"
+        rf"|$"
+        rf")",
+        flags=re.IGNORECASE,
+    )
+
+    match = pattern.search(text)
+
+    if not match:
+        return ""
+
+    result = match.group("result").strip()
+
+    # Normalize the heading capitalization while keeping its contents.
+    result = re.sub(
+        rf"^{re.escape(heading)}\s*:",
+        f"{heading}:",
+        result,
+        count=1,
+        flags=re.IGNORECASE,
+    )
+
+    return result
+
+
+def extract_course_codes(value: Any) -> list[str]:
+    """
+    Extract normalized course codes such as BIOL112 from requisite text.
+    Examples:
+        BIOL 112   -> BIOL112
+        CLST_V 232 -> CLST232
+        AMNE_V 216 -> AMNE216
+    """
+    text = clean_description(value)
+
+    if not text:
+        return []
+
+    matches = re.findall(
+        r"\b([A-Z]{2,5})(?:_[A-Z]+)?[\s-]*(\d{3}[A-Z]?)\b",
+        text.upper(),
+    )
+
+    normalized_codes = [
+        f"{subject}{number}"
+        for subject, number in matches
+    ]
+
+    return list(dict.fromkeys(normalized_codes))
+
+
+def parse_terms_offered(value: Any) -> list[str]:
+    """
+    Convert catalogue term codes into planner term labels.
+
+    W1   -> Winter Term 1
+    W2   -> Winter Term 2
+    W1-2 -> Winter Term 1 and Winter Term 2
+    S1   -> Summer
+    S2   -> Summer
+    S1-2 -> Summer
+
+    Mixed values such as W1, S1 are also supported.
+    """
+    if pd.isna(value):
+        return []
+
+    raw_term = str(value).strip().upper()
+
+    if not raw_term:
+        return []
+
+    terms: list[str] = []
+
+    if re.search(r"\bW1\s*-\s*2\b", raw_term):
+        terms.extend(
+            [
+                "Winter Term 1",
+                "Winter Term 2",
+            ]
+        )
+    else:
+        if re.search(r"\bW1\b", raw_term):
+            terms.append("Winter Term 1")
+
+        if re.search(r"\bW2\b", raw_term):
+            terms.append("Winter Term 2")
+
+    if (
+        re.search(r"\bS1\s*-\s*2\b", raw_term)
+        or re.search(r"\bS1\b", raw_term)
+        or re.search(r"\bS2\b", raw_term)
+    ):
+        terms.append("Summer")
+
+    # Preserve order while removing duplicates.
+    return list(dict.fromkeys(terms))
+
+
+def combine_terms(term_lists: pd.Series) -> list[str]:
+    combined_terms: list[str] = []
+
+    for term_list in term_lists:
+        if not isinstance(term_list, list):
+            continue
+
+        for term in term_list:
+            if term not in combined_terms:
+                combined_terms.append(term)
+
+    if not combined_terms:
+        return ["Winter Term 1"]
+
+    return sorted(
+        combined_terms,
+        key=lambda term: TERM_ORDER.get(term, 99),
+    )
+
+
+def first_non_empty(values: pd.Series) -> Any:
+    for value in values:
+        if isinstance(value, str):
+            if value.strip():
+                return value.strip()
+        elif pd.notna(value):
+            return value
+
+    return ""
+
+
+def combine_course_codes(
+    code_lists: pd.Series,
+    valid_course_codes: set[str],
+) -> list[str]:
+    combined_codes: list[str] = []
+
+    for code_list in code_lists:
+        if not isinstance(code_list, list):
+            continue
+
+        for course_code in code_list:
+            if (
+                course_code in valid_course_codes
+                and course_code not in combined_codes
+            ):
+                combined_codes.append(course_code)
+
+    return combined_codes
+
+
+def clean_data(df1: pd.DataFrame) -> pd.DataFrame:
     combined_df = df1.copy()
 
     required_columns = {
@@ -104,6 +316,8 @@ def clean_data(df1):
         "Course Number",
         "Section Title",
         "Maximum Credits",
+        "Description",
+        "Term",
     }
 
     missing_columns = required_columns.difference(
@@ -112,6 +326,7 @@ def clean_data(df1):
 
     if missing_columns:
         missing = ", ".join(sorted(missing_columns))
+
         raise ValueError(
             f"Missing required columns: {missing}"
         )
@@ -147,6 +362,40 @@ def clean_data(df1):
         "Section Title"
     ].fillna("").astype(str).str.strip()
 
+    combined_df["description"] = combined_df[
+        "Description"
+    ].apply(clean_description)
+
+    combined_df["prerequisite_text"] = combined_df[
+        "description"
+    ].apply(
+        lambda description: extract_requisite_text(
+            description,
+            "Prerequisite",
+        )
+    )
+
+    combined_df["corequisite_text"] = combined_df[
+        "description"
+    ].apply(
+        lambda description: extract_requisite_text(
+            description,
+            "Corequisite",
+        )
+    )
+
+    combined_df["prerequisite_codes_raw"] = combined_df[
+        "prerequisite_text"
+    ].apply(extract_course_codes)
+
+    combined_df["corequisite_codes_raw"] = combined_df[
+        "corequisite_text"
+    ].apply(extract_course_codes)
+
+    combined_df["terms_offered_raw"] = combined_df[
+        "Term"
+    ].apply(parse_terms_offered)
+
     # Keep only valid undergraduate course numbers below 500.
     numeric_course_numbers = pd.to_numeric(
         combined_df["course_number"],
@@ -165,28 +414,99 @@ def clean_data(df1):
         & combined_df["course_code"].ne("")
     ].copy()
 
-    # Multiple rows may exist for lectures, labs, tutorials, or terms.
-    # Keep one row per course code.
-    cleaned_df = combined_df.drop_duplicates(
-        subset=["course_code"],
-        keep="first",
+    valid_course_codes = set(
+        combined_df["course_code"].dropna().astype(str)
     )
 
-    return cleaned_df
+    grouped_rows: list[dict[str, Any]] = []
+
+    for course_code, group in combined_df.groupby(
+        "course_code",
+        sort=False,
+    ):
+        prerequisite_text = first_non_empty(
+            group["prerequisite_text"]
+        )
+
+        corequisite_text = first_non_empty(
+            group["corequisite_text"]
+        )
+
+        grouped_rows.append(
+            {
+                "course_code": course_code,
+                "display_code": first_non_empty(
+                    group["display_code"]
+                ),
+                "subject": first_non_empty(
+                    group["subject"]
+                ),
+                "course_number": first_non_empty(
+                    group["course_number"]
+                ),
+                "course_level": first_non_empty(
+                    group["course_level"]
+                ),
+                "course_title": first_non_empty(
+                    group["course_title"]
+                ),
+                "credits": first_non_empty(
+                    group["credits"]
+                ),
+                "terms_offered": combine_terms(
+                    group["terms_offered_raw"]
+                ),
+                "prerequisite_text": prerequisite_text,
+                "corequisite_text": corequisite_text,
+                "prerequisites": combine_course_codes(
+                    group["prerequisite_codes_raw"],
+                    valid_course_codes,
+                ),
+                "corequisites": combine_course_codes(
+                    group["corequisite_codes_raw"],
+                    valid_course_codes,
+                ),
+            }
+        )
+
+    return pd.DataFrame(grouped_rows)
 
 
-def build_course_catalogue(cleaned_df):
-    courses_json = []
+def build_course_catalogue(
+    cleaned_df: pd.DataFrame,
+) -> list[dict[str, Any]]:
+    courses_json: list[dict[str, Any]] = []
 
     for _, row in cleaned_df.iterrows():
+        course_level = row["course_level"]
+
+        if pd.isna(course_level):
+            normalized_course_level = None
+        else:
+            normalized_course_level = int(course_level)
+
+        credits = row["credits"]
+
+        if pd.isna(credits):
+            normalized_credits = None
+        elif isinstance(credits, float) and credits.is_integer():
+            normalized_credits = int(credits)
+        else:
+            normalized_credits = credits
+
         course_entry = {
             "course_code": row["course_code"],
             "display_code": row["display_code"],
             "subject": row["subject"],
             "course_number": row["course_number"],
-            "course_level": row["course_level"],
+            "course_level": normalized_course_level,
             "course_title": row["course_title"],
-            "credits": row["credits"],
+            "credits": normalized_credits,
+            "terms_offered": row["terms_offered"],
+            "prerequisite_text": row["prerequisite_text"],
+            "corequisite_text": row["corequisite_text"],
+            "prerequisites": row["prerequisites"],
+            "corequisites": row["corequisites"],
         }
 
         courses_json.append(course_entry)
@@ -198,15 +518,9 @@ def build_course_catalogue(cleaned_df):
     return courses_json
 
 
-if __name__ == "__main__":
-    df1 = load_excel_file()
-
-    if df1 is None:
-        raise SystemExit(1)
-
-    cleaned_df = clean_data(df1)
-    courses_json = build_course_catalogue(cleaned_df)
-
+def write_catalogue(
+    courses_json: list[dict[str, Any]],
+) -> str:
     base_dir = os.path.abspath(
         os.path.dirname(__file__)
     )
@@ -231,10 +545,23 @@ if __name__ == "__main__":
 
         file.write("\n")
 
-    print(
-        f"Generated {len(courses_json)} courses."
+    return output_path
+
+
+if __name__ == "__main__":
+    dataframe = load_excel_file()
+
+    if dataframe is None:
+        raise SystemExit(1)
+
+    cleaned_dataframe = clean_data(dataframe)
+    catalogue = build_course_catalogue(
+        cleaned_dataframe
     )
 
-    print(
-        f"Output written to: {output_path}"
+    generated_output_path = write_catalogue(
+        catalogue
     )
+
+    print(f"Generated {len(catalogue)} courses.")
+    print(f"Output written to: {generated_output_path}")
