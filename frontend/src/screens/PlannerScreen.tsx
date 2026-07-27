@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { BookOpen, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
 import { academicYears, concentrations, programs } from '../data/setupOptions'
 import type { StudentSetupProfile } from '../types/studentProfile'
 import type { CourseAttempt, PlannerTerm, PlannerYear } from '../types/coursePlan'
@@ -7,15 +7,39 @@ import type { CatalogueCourse } from '../types/courseCatalogue'
 import CourseSearchPanel, {
   type CourseSearchPanelHandle,
 } from '../components/planner/CourseSearchPanel'
-import AddCourseModal from '../components/planner/AddCourseModal'
+import EditCourseModal from '../components/planner/AddCourseModal'
 import CourseCard from '../components/planner/CourseCard'
+
+const REPEAT_BLOCKED_MESSAGE =
+  'This course is already in the plan and cannot be added again unless all previous attempts were failed or withdrawn.'
+
+function mapCourseLevelToYear(level: number): PlannerYear {
+  if (!Number.isFinite(level) || level < 100) {
+    console.warn(`[PlannerScreen] Invalid course_level "${level}"; defaulting to Year 1`)
+    return 1
+  }
+  if (level >= 500) return 5
+  if (level >= 400) return 4
+  if (level >= 300) return 3
+  if (level >= 200) return 2
+  return 1
+}
+
+function mapFirstTermOffered(terms: CatalogueCourse['terms_offered'] | undefined): PlannerTerm {
+  const first = terms?.[0]
+  if (first === 'Winter Term 1') return 'winter_1'
+  if (first === 'Winter Term 2') return 'winter_2'
+  if (first === 'Summer') return 'summer'
+  console.warn(`[PlannerScreen] Invalid terms_offered value "${String(first)}"; defaulting to Winter Term 1`)
+  return 'winter_1'
+}
 
 const PLANNER_SECTIONS: { id: PlannerYear; label: string }[] = [
   { id: 1, label: 'Year 1' },
   { id: 2, label: 'Year 2' },
   { id: 3, label: 'Year 3' },
   { id: 4, label: 'Year 4' },
-  { id: 5, label: 'Future Plan' },
+  { id: 5, label: 'Year 5+' },
 ]
 
 const PLANNER_TERMS: { id: PlannerTerm; label: string }[] = [
@@ -53,12 +77,14 @@ function TermColumn({
   attempts,
   repeatCodes,
   onAddClick,
+  onEditAttempt,
   onDeleteAttempt,
 }: {
   label: string
   attempts: CourseAttempt[]
   repeatCodes: Set<string>
   onAddClick: () => void
+  onEditAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
 }) {
   return (
@@ -77,6 +103,7 @@ function TermColumn({
               key={attempt.attempt_id}
               attempt={attempt}
               isRepeat={repeatCodes.has(normalizeCourseCode(attempt.course_code))}
+              onEdit={onEditAttempt}
               onDelete={onDeleteAttempt}
             />
           ))
@@ -102,6 +129,7 @@ function PlannerSection({
   repeatCodes,
   onToggle,
   onAddClick,
+  onEditAttempt,
   onDeleteAttempt,
 }: {
   id: PlannerYear
@@ -110,7 +138,8 @@ function PlannerSection({
   attempts: CourseAttempt[]
   repeatCodes: Set<string>
   onToggle: () => void
-  onAddClick: (year: PlannerYear, term: PlannerTerm) => void
+  onAddClick: () => void
+  onEditAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
 }) {
   return (
@@ -138,7 +167,8 @@ function PlannerSection({
                 (attempt) => attempt.year_taken === id && attempt.term_taken === term.id,
               )}
               repeatCodes={repeatCodes}
-              onAddClick={() => onAddClick(id, term.id)}
+              onAddClick={onAddClick}
+              onEditAttempt={onEditAttempt}
               onDeleteAttempt={onDeleteAttempt}
             />
           ))}
@@ -152,26 +182,21 @@ export default function PlannerScreen({
   profile,
   attempts,
   onAddAttempt,
+  onUpdateAttempt,
   onDeleteAttempt,
   onBack,
 }: {
   profile: StudentSetupProfile
   attempts: CourseAttempt[]
   onAddAttempt: (attempt: CourseAttempt) => void
+  onUpdateAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
   onBack: () => void
 }) {
   const [expanded, setExpanded] = useState<Set<PlannerYear>>(new Set([1]))
-  const [modalCourse, setModalCourse] = useState<CatalogueCourse | null>(null)
-  const [modalPlacement, setModalPlacement] = useState<{ year: PlannerYear; term: PlannerTerm }>({
-    year: 1,
-    term: 'winter_1',
-  })
-  const preferredPlacementRef = useRef<{ year: PlannerYear; term: PlannerTerm } | null>(null)
+  const [editingAttempt, setEditingAttempt] = useState<CourseAttempt | null>(null)
+  const [blockedNotice, setBlockedNotice] = useState<string | null>(null)
   const searchPanelRef = useRef<CourseSearchPanelHandle>(null)
-
-  const studentYear: PlannerYear =
-    typeof profile.academic_year === 'number' ? (profile.academic_year as PlannerYear) : 1
 
   const repeatCodes = new Set<string>()
   const seenCodes = new Set<string>()
@@ -195,28 +220,62 @@ export default function PlannerScreen({
     })
   }
 
-  const handleAddCourseClick = (year: PlannerYear, term: PlannerTerm) => {
-    preferredPlacementRef.current = { year, term }
+  const handleAddCourseClick = () => {
     searchPanelRef.current?.focusInput()
   }
 
+  const isRepeatBlocked = (courseCode: string) => {
+    const normalized = normalizeCourseCode(courseCode)
+    const matching = attempts.filter((attempt) => normalizeCourseCode(attempt.course_code) === normalized)
+    return (
+      matching.length > 0 &&
+      !matching.every((attempt) => attempt.status === 'completed' && (attempt.grade === 'F' || attempt.grade === 'W'))
+    )
+  }
+
   const handleSelectCourse = (course: CatalogueCourse) => {
-    const placement = preferredPlacementRef.current ?? { year: studentYear, term: 'winter_1' as PlannerTerm }
-    preferredPlacementRef.current = null
-    setModalPlacement(placement)
-    setModalCourse(course)
-  }
+    if (isRepeatBlocked(course.course_code)) {
+      setBlockedNotice(REPEAT_BLOCKED_MESSAGE)
+      return
+    }
+    setBlockedNotice(null)
 
-  const closeModal = () => {
-    setModalCourse(null)
+    const year = mapCourseLevelToYear(course.course_level)
+    const term = mapFirstTermOffered(course.terms_offered)
+
+    onAddAttempt({
+      attempt_id: crypto.randomUUID(),
+      course_code: course.course_code,
+      display_code: course.display_code,
+      subject: course.subject,
+      course_number: course.course_number,
+      course_level: course.course_level,
+      course_title: course.course_title,
+      credits: course.credits,
+      status: 'completed',
+      grade: 'P',
+      percentage: null,
+      year_taken: year,
+      term_taken: term,
+      source: 'manual',
+    })
+    setExpanded((prev) => new Set(prev).add(year))
     searchPanelRef.current?.focusLastResult()
   }
 
-  const handleConfirmAttempt = (attempt: CourseAttempt) => {
-    onAddAttempt(attempt)
-    setExpanded((prev) => new Set(prev).add(attempt.year_taken))
-    setModalCourse(null)
+  const handleEditAttempt = (attempt: CourseAttempt) => {
+    setEditingAttempt(attempt)
+  }
+
+  const closeEditModal = () => {
+    setEditingAttempt(null)
     searchPanelRef.current?.focusLastResult()
+  }
+
+  const handleConfirmEdit = (updatedAttempt: CourseAttempt) => {
+    onUpdateAttempt(updatedAttempt)
+    setExpanded((prev) => new Set(prev).add(updatedAttempt.year_taken))
+    setEditingAttempt(null)
   }
 
   return (
@@ -263,6 +322,19 @@ export default function PlannerScreen({
         <CourseSearchPanel ref={searchPanelRef} onSelectCourse={handleSelectCourse} />
 
         <main className="min-w-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
+          {blockedNotice && (
+            <div className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+              <span>{blockedNotice}</span>
+              <button
+                type="button"
+                onClick={() => setBlockedNotice(null)}
+                aria-label="Dismiss message"
+                className="flex-shrink-0 rounded p-0.5 text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
           {PLANNER_SECTIONS.map((section) => (
             <PlannerSection
               key={section.id}
@@ -273,20 +345,18 @@ export default function PlannerScreen({
               repeatCodes={repeatCodes}
               onToggle={() => toggleSection(section.id)}
               onAddClick={handleAddCourseClick}
+              onEditAttempt={handleEditAttempt}
               onDeleteAttempt={onDeleteAttempt}
             />
           ))}
         </main>
       </div>
 
-      {modalCourse && (
-        <AddCourseModal
-          course={modalCourse}
-          defaultYear={modalPlacement.year}
-          defaultTerm={modalPlacement.term}
-          existingAttempts={attempts}
-          onConfirm={handleConfirmAttempt}
-          onDismiss={closeModal}
+      {editingAttempt && (
+        <EditCourseModal
+          attempt={editingAttempt}
+          onConfirm={handleConfirmEdit}
+          onDismiss={closeEditModal}
         />
       )}
     </div>

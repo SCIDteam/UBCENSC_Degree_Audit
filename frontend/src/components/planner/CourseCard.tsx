@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import type { CourseAttempt, StoredCourseGrade, StoredCourseStatus } from '../../types/coursePlan'
 
 const STATUS_LABELS: Record<StoredCourseStatus, string> = {
@@ -64,10 +64,12 @@ function resolveTreatment(status: StoredCourseStatus, grade: StoredCourseGrade):
 export default function CourseCard({
   attempt,
   isRepeat,
+  onEdit,
   onDelete,
 }: {
   attempt: CourseAttempt
   isRepeat: boolean
+  onEdit: (attempt: CourseAttempt) => void
   onDelete: (attemptId: string) => void
 }) {
   const treatment = resolveTreatment(attempt.status, attempt.grade)
@@ -91,14 +93,24 @@ export default function CourseCard({
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => onDelete(attempt.attempt_id)}
-          aria-label={`Remove ${attempt.display_code} from plan`}
-          className="flex-shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-        >
-          <Trash2 size={12} />
-        </button>
+        <div className="flex flex-shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => onEdit(attempt)}
+            aria-label={`Edit ${attempt.display_code}`}
+            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+          >
+            <Pencil size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(attempt.attempt_id)}
+            aria-label={`Remove ${attempt.display_code} from plan`}
+            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
       </div>
 
       <p className={`text-[11px] leading-snug ${treatment.titleClassName}`}>{attempt.course_title}</p>

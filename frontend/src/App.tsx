@@ -43,6 +43,12 @@ function App() {
     setAttempts((prev) => [...prev, attempt])
   }
 
+  const updateAttempt = (updatedAttempt: CourseAttempt) => {
+    setAttempts((prev) =>
+      prev.map((attempt) => (attempt.attempt_id === updatedAttempt.attempt_id ? updatedAttempt : attempt)),
+    )
+  }
+
   const deleteAttempt = (attemptId: string) => {
     setAttempts((prev) => prev.filter((attempt) => attempt.attempt_id !== attemptId))
   }
@@ -53,6 +59,7 @@ function App() {
         profile={profile}
         attempts={attempts}
         onAddAttempt={addAttempt}
+        onUpdateAttempt={updateAttempt}
         onDeleteAttempt={deleteAttempt}
         onBack={() => setScreen('setup')}
       />

@@ -1,6 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import type { CatalogueCourse } from '../../types/courseCatalogue'
 import type {
   CourseAttempt,
   PlannerTerm,
@@ -14,7 +13,7 @@ const YEAR_OPTIONS: { value: PlannerYear; label: string }[] = [
   { value: 2, label: 'Year 2' },
   { value: 3, label: 'Year 3' },
   { value: 4, label: 'Year 4' },
-  { value: 5, label: 'Future Plan' },
+  { value: 5, label: 'Year 5+' },
 ]
 
 const TERM_OPTIONS: { value: PlannerTerm; label: string }[] = [
@@ -86,42 +85,32 @@ const ModalSelect = forwardRef<
   )
 })
 
-function normalizeCourseCode(code: string) {
-  return code.trim().toUpperCase()
-}
-
-export default function AddCourseModal({
-  course,
-  defaultYear,
-  defaultTerm,
-  existingAttempts,
+export default function EditCourseModal({
+  attempt,
   onConfirm,
   onDismiss,
 }: {
-  course: CatalogueCourse
-  defaultYear: PlannerYear
-  defaultTerm: PlannerTerm
-  existingAttempts: CourseAttempt[]
+  attempt: CourseAttempt
   onConfirm: (attempt: CourseAttempt) => void
   onDismiss: () => void
 }) {
-  const [year, setYear] = useState<PlannerYear>(defaultYear)
-  const [term, setTerm] = useState<PlannerTerm>(defaultTerm)
-  const [status, setStatus] = useState<StoredCourseStatus | ''>('')
-  const [grade, setGrade] = useState<StoredCourseGrade>('')
+  const [year, setYear] = useState<PlannerYear>(attempt.year_taken)
+  const [term, setTerm] = useState<PlannerTerm>(attempt.term_taken)
+  const [status, setStatus] = useState<StoredCourseStatus | ''>(attempt.status)
+  const [grade, setGrade] = useState<StoredCourseGrade>(attempt.grade)
   const [touched, setTouched] = useState({ status: false, grade: false })
   const firstFieldRef = useRef<HTMLSelectElement>(null)
 
   useEffect(() => {
-    setYear(defaultYear)
-    setTerm(defaultTerm)
-    setStatus('')
-    setGrade('')
+    setYear(attempt.year_taken)
+    setTerm(attempt.term_taken)
+    setStatus(attempt.status)
+    setGrade(attempt.grade)
     setTouched({ status: false, grade: false })
     const timer = setTimeout(() => firstFieldRef.current?.focus(), 0)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [course])
+  }, [attempt.attempt_id])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -131,16 +120,8 @@ export default function AddCourseModal({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onDismiss])
 
-  const normalizedCode = normalizeCourseCode(course.course_code)
-  const matchingAttempts = existingAttempts.filter(
-    (attempt) => normalizeCourseCode(attempt.course_code) === normalizedCode,
-  )
-  const repeatBlocked =
-    matchingAttempts.length > 0 &&
-    !matchingAttempts.every((attempt) => attempt.status === 'completed' && (attempt.grade === 'F' || attempt.grade === 'W'))
-
   const gradeRequired = status === 'completed'
-  const valid = !!year && !!term && !!status && (!gradeRequired || !!grade) && !repeatBlocked
+  const valid = !!year && !!term && !!status && (!gradeRequired || !!grade)
 
   const handleStatusChange = (value: string) => {
     const nextStatus = value as StoredCourseStatus
@@ -151,20 +132,12 @@ export default function AddCourseModal({
   const handleConfirm = () => {
     if (!valid || !status) return
     onConfirm({
-      attempt_id: crypto.randomUUID(),
-      course_code: course.course_code,
-      display_code: course.display_code,
-      subject: course.subject,
-      course_number: course.course_number,
-      course_level: course.course_level,
-      course_title: course.course_title,
-      credits: course.credits,
+      ...attempt,
       status,
       grade,
       percentage: null,
       year_taken: year,
       term_taken: term,
-      source: 'manual',
     })
   }
 
@@ -176,16 +149,16 @@ export default function AddCourseModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="add-course-modal-title"
+        aria-labelledby="edit-course-modal-title"
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-sm rounded-xl border border-border bg-card p-5 shadow-xl"
       >
         <div className="mb-1 flex items-start justify-between">
           <h3
-            id="add-course-modal-title"
+            id="edit-course-modal-title"
             className="font-heading text-sm font-bold text-foreground"
           >
-            Add to plan
+            Edit course
           </h3>
           <button
             type="button"
@@ -197,21 +170,14 @@ export default function AddCourseModal({
           </button>
         </div>
         <p className="text-xs text-muted-foreground">
-          {course.display_code} · {course.credits} cr
+          {attempt.display_code} · {attempt.credits} cr
         </p>
-        <p className="mt-2 text-xs text-foreground/80">{course.course_title}</p>
-
-        {repeatBlocked && (
-          <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive">
-            This course is already in the plan and cannot be added again unless all previous
-            attempts were failed or withdrawn.
-          </p>
-        )}
+        <p className="mt-2 text-xs text-foreground/80">{attempt.course_title}</p>
 
         <div className="mt-4 grid grid-cols-2 gap-3">
           <ModalSelect
             ref={firstFieldRef}
-            id="add-course-year"
+            id="edit-course-year"
             label="Year"
             value={String(year)}
             onChange={(value) => setYear(Number(value) as PlannerYear)}
@@ -223,7 +189,7 @@ export default function AddCourseModal({
             required
           />
           <ModalSelect
-            id="add-course-term"
+            id="edit-course-term"
             label="Term"
             value={term}
             onChange={(value) => setTerm(value as PlannerTerm)}
@@ -235,7 +201,7 @@ export default function AddCourseModal({
 
         <div className="mt-3 grid grid-cols-2 gap-3">
           <ModalSelect
-            id="add-course-status"
+            id="edit-course-status"
             label="Status"
             value={status}
             onChange={handleStatusChange}
@@ -246,7 +212,7 @@ export default function AddCourseModal({
             required
           />
           <ModalSelect
-            id="add-course-grade"
+            id="edit-course-grade"
             label="Grade"
             value={grade}
             onChange={(value) => setGrade(value as StoredCourseGrade)}
@@ -280,7 +246,7 @@ export default function AddCourseModal({
                 : 'cursor-not-allowed bg-muted text-muted-foreground',
             ].join(' ')}
           >
-            Add to Plan
+            Save Changes
           </button>
         </div>
       </div>
