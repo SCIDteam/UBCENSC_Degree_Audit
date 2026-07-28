@@ -1,14 +1,19 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BookOpen, ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
 import { academicYears, concentrations, programs } from '../data/setupOptions'
 import type { StudentSetupProfile } from '../types/studentProfile'
-import type { CourseAttempt, PlannerTerm, PlannerYear } from '../types/coursePlan'
+import type { CourseAddedToast, CourseAttempt, PlannerTerm, PlannerYear } from '../types/coursePlan'
 import type { CatalogueCourse } from '../types/courseCatalogue'
 import CourseSearchPanel, {
   type CourseSearchPanelHandle,
 } from '../components/planner/CourseSearchPanel'
 import EditCourseModal from '../components/planner/AddCourseModal'
 import CourseCard from '../components/planner/CourseCard'
+import CourseAddedToastRegion from '../components/planner/CourseAddedToastRegion'
+
+const TOAST_DURATION_MS = 3000
+const HIGHLIGHT_DURATION_MS = 1500
+const MAX_VISIBLE_TOASTS = 3
 
 const REPEAT_BLOCKED_MESSAGE =
   'This course is already in the plan and cannot be added again unless all previous attempts were failed or withdrawn.'
@@ -48,6 +53,14 @@ const PLANNER_TERMS: { id: PlannerTerm; label: string }[] = [
   { id: 'summer', label: 'Summer' },
 ]
 
+const YEAR_LABELS = Object.fromEntries(
+  PLANNER_SECTIONS.map((section) => [section.id, section.label]),
+) as Record<PlannerYear, string>
+
+const TERM_LABELS = Object.fromEntries(
+  PLANNER_TERMS.map((term) => [term.id, term.label]),
+) as Record<PlannerTerm, string>
+
 function normalizeCourseCode(code: string) {
   return code.trim().toUpperCase()
 }
@@ -76,6 +89,7 @@ function TermColumn({
   label,
   attempts,
   repeatCodes,
+  highlightedAttemptIds,
   onAddClick,
   onEditAttempt,
   onDeleteAttempt,
@@ -83,6 +97,7 @@ function TermColumn({
   label: string
   attempts: CourseAttempt[]
   repeatCodes: Set<string>
+  highlightedAttemptIds: Set<string>
   onAddClick: () => void
   onEditAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
@@ -103,6 +118,7 @@ function TermColumn({
               key={attempt.attempt_id}
               attempt={attempt}
               isRepeat={repeatCodes.has(normalizeCourseCode(attempt.course_code))}
+              isHighlighted={highlightedAttemptIds.has(attempt.attempt_id)}
               onEdit={onEditAttempt}
               onDelete={onDeleteAttempt}
             />
@@ -127,6 +143,7 @@ function PlannerSection({
   expanded,
   attempts,
   repeatCodes,
+  highlightedAttemptIds,
   onToggle,
   onAddClick,
   onEditAttempt,
@@ -137,6 +154,7 @@ function PlannerSection({
   expanded: boolean
   attempts: CourseAttempt[]
   repeatCodes: Set<string>
+  highlightedAttemptIds: Set<string>
   onToggle: () => void
   onAddClick: () => void
   onEditAttempt: (attempt: CourseAttempt) => void
@@ -167,6 +185,7 @@ function PlannerSection({
                 (attempt) => attempt.year_taken === id && attempt.term_taken === term.id,
               )}
               repeatCodes={repeatCodes}
+              highlightedAttemptIds={highlightedAttemptIds}
               onAddClick={onAddClick}
               onEditAttempt={onEditAttempt}
               onDeleteAttempt={onDeleteAttempt}
@@ -196,7 +215,25 @@ export default function PlannerScreen({
   const [expanded, setExpanded] = useState<Set<PlannerYear>>(new Set([1]))
   const [editingAttempt, setEditingAttempt] = useState<CourseAttempt | null>(null)
   const [blockedNotice, setBlockedNotice] = useState<string | null>(null)
+  const [toasts, setToasts] = useState<CourseAddedToast[]>([])
+  const [highlightedAttemptIds, setHighlightedAttemptIds] = useState<Set<string>>(new Set())
   const searchPanelRef = useRef<CourseSearchPanelHandle>(null)
+  const timersRef = useRef<Set<number>>(new Set())
+
+  useEffect(() => {
+    const timers = timersRef.current
+    return () => {
+      timers.forEach((timerId) => window.clearTimeout(timerId))
+    }
+  }, [])
+
+  const runAfterDelay = (delayMs: number, callback: () => void) => {
+    const timerId = window.setTimeout(() => {
+      timersRef.current.delete(timerId)
+      callback()
+    }, delayMs)
+    timersRef.current.add(timerId)
+  }
 
   const repeatCodes = new Set<string>()
   const seenCodes = new Set<string>()
@@ -242,9 +279,10 @@ export default function PlannerScreen({
 
     const year = mapCourseLevelToYear(course.course_level)
     const term = mapFirstTermOffered(course.terms_offered)
+    const attemptId = crypto.randomUUID()
 
     onAddAttempt({
-      attempt_id: crypto.randomUUID(),
+      attempt_id: attemptId,
       course_code: course.course_code,
       display_code: course.display_code,
       subject: course.subject,
@@ -260,6 +298,22 @@ export default function PlannerScreen({
       source: 'manual',
     })
     setExpanded((prev) => new Set(prev).add(year))
+
+    setHighlightedAttemptIds((prev) => new Set(prev).add(attemptId))
+    runAfterDelay(HIGHLIGHT_DURATION_MS, () => {
+      setHighlightedAttemptIds((prev) => {
+        const next = new Set(prev)
+        next.delete(attemptId)
+        return next
+      })
+    })
+
+    const toastId = crypto.randomUUID()
+    setToasts((prev) => [{ id: toastId, courseCode: course.display_code, year, term }, ...prev].slice(0, MAX_VISIBLE_TOASTS))
+    runAfterDelay(TOAST_DURATION_MS, () => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== toastId))
+    })
+
     searchPanelRef.current?.focusLastResult()
   }
 
@@ -343,6 +397,7 @@ export default function PlannerScreen({
               expanded={expanded.has(section.id)}
               attempts={attempts}
               repeatCodes={repeatCodes}
+              highlightedAttemptIds={highlightedAttemptIds}
               onToggle={() => toggleSection(section.id)}
               onAddClick={handleAddCourseClick}
               onEditAttempt={handleEditAttempt}
@@ -351,6 +406,8 @@ export default function PlannerScreen({
           ))}
         </main>
       </div>
+
+      <CourseAddedToastRegion toasts={toasts} yearLabels={YEAR_LABELS} termLabels={TERM_LABELS} />
 
       {editingAttempt && (
         <EditCourseModal

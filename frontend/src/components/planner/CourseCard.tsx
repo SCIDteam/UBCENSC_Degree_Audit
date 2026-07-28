@@ -64,11 +64,13 @@ function resolveTreatment(status: StoredCourseStatus, grade: StoredCourseGrade):
 export default function CourseCard({
   attempt,
   isRepeat,
+  isHighlighted,
   onEdit,
   onDelete,
 }: {
   attempt: CourseAttempt
   isRepeat: boolean
+  isHighlighted: boolean
   onEdit: (attempt: CourseAttempt) => void
   onDelete: (attemptId: string) => void
 }) {
@@ -77,7 +79,9 @@ export default function CourseCard({
 
   return (
     <div
-      className={`flex flex-col gap-1.5 rounded-md border border-border border-l-4 bg-card px-2.5 py-2 ${treatment.border}`}
+      className={`flex flex-col gap-1.5 rounded-md border border-border border-l-4 bg-card px-2.5 py-2 transition-colors duration-500 ${treatment.border} ${
+        isHighlighted ? 'ring-2 ring-ring bg-accent/20' : ''
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5">

@@ -22,3 +22,10 @@ export type CourseAttempt = {
   term_taken: PlannerTerm
   source: 'manual' | 'synthetic'
 }
+
+export type CourseAddedToast = {
+  id: string
+  courseCode: string
+  year: PlannerYear
+  term: PlannerTerm
+}
