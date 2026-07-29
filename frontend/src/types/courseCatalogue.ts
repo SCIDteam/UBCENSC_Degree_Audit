@@ -16,4 +16,9 @@ export type CatalogueCourse = {
   corequisite_text: string;
   prerequisites: string[];
   corequisites: string[];
+  is_science_credit: boolean;
+  is_arts_credit: boolean;
+  is_upper_level: boolean;
+  breadth_categories: string[];
+  classification_notes: string[];
 };

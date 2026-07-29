@@ -2,10 +2,22 @@ import type { CatalogueCourse } from '../types/courseCatalogue'
 
 let cataloguePromise: Promise<CatalogueCourse[]> | null = null
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
 function isCatalogueCourse(value: unknown): value is CatalogueCourse {
   if (!value || typeof value !== 'object') return false
   const course = value as Record<string, unknown>
-  return typeof course.course_code === 'string' && typeof course.display_code === 'string'
+  return (
+    typeof course.course_code === 'string' &&
+    typeof course.display_code === 'string' &&
+    typeof course.is_science_credit === 'boolean' &&
+    typeof course.is_arts_credit === 'boolean' &&
+    typeof course.is_upper_level === 'boolean' &&
+    isStringArray(course.breadth_categories) &&
+    isStringArray(course.classification_notes)
+  )
 }
 
 export function loadCourseCatalogue(): Promise<CatalogueCourse[]> {

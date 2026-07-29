@@ -1,12 +1,88 @@
 import json
 import os
 import re
+import sys
 from typing import Any
 
 import pandas as pd
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from audit import course_classification_core as classification_core
 
 INPUT_FILENAME = "Course-Data-2026-07-22 Summer.xlsx"
+
+FACULTY_REQUIREMENTS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "faculty_requirements",
+)
+
+
+def load_classification_rules() -> pd.DataFrame:
+    path = os.path.join(
+        FACULTY_REQUIREMENTS_DIR,
+        "faculty_course_classification_rules.csv",
+    )
+
+    return pd.read_csv(path).fillna("")
+
+
+def load_breadth_rules() -> pd.DataFrame:
+    path = os.path.join(
+        FACULTY_REQUIREMENTS_DIR,
+        "faculty_breadth_categories.csv",
+    )
+
+    return pd.read_csv(path).fillna("")
+
+
+def classify_catalogue_course(
+    row: dict[str, Any],
+    classification_rules: pd.DataFrame,
+    breadth_rules: pd.DataFrame,
+) -> dict[str, Any]:
+    """
+    Classify a single catalogue course using the same Faculty rule
+    semantics as CourseClassifier. Catalogue courses have no student
+    overrides, so effective_course_code is always the course's own code.
+    """
+
+    classification_row = {
+        "effective_course_code": row["course_code"],
+        "subject": row["subject"],
+        "course_number": row["course_number"],
+    }
+
+    is_science_credit = classification_core.is_science_credit(
+        classification_row, classification_rules
+    )
+    is_arts_credit = classification_core.is_arts_credit(
+        classification_row, classification_rules, science_credit=is_science_credit
+    )
+    breadth_categories = classification_core.get_breadth_categories(
+        classification_row, breadth_rules
+    )
+
+    notes: list[str] = []
+
+    if is_science_credit:
+        notes.append("Science credit")
+
+    if is_arts_credit:
+        notes.append("Arts credit")
+
+    if breadth_categories:
+        notes.append(f"Breadth: {';'.join(breadth_categories)}")
+
+    return {
+        "is_science_credit": is_science_credit,
+        "is_arts_credit": is_arts_credit,
+        "is_upper_level": classification_core.is_upper_level(
+            row["course_level"]
+        ),
+        "breadth_categories": breadth_categories,
+        "classification_notes": notes,
+    }
 
 TERM_ORDER = {
     "Winter Term 1": 0,
@@ -474,6 +550,8 @@ def clean_data(df1: pd.DataFrame) -> pd.DataFrame:
 
 def build_course_catalogue(
     cleaned_df: pd.DataFrame,
+    classification_rules: pd.DataFrame,
+    breadth_rules: pd.DataFrame,
 ) -> list[dict[str, Any]]:
     courses_json: list[dict[str, Any]] = []
 
@@ -508,6 +586,14 @@ def build_course_catalogue(
             "prerequisites": row["prerequisites"],
             "corequisites": row["corequisites"],
         }
+
+        course_entry.update(
+            classify_catalogue_course(
+                course_entry,
+                classification_rules,
+                breadth_rules,
+            )
+        )
 
         courses_json.append(course_entry)
 
@@ -556,7 +642,9 @@ if __name__ == "__main__":
 
     cleaned_dataframe = clean_data(dataframe)
     catalogue = build_course_catalogue(
-        cleaned_dataframe
+        cleaned_dataframe,
+        classification_rules=load_classification_rules(),
+        breadth_rules=load_breadth_rules(),
     )
 
     generated_output_path = write_catalogue(
