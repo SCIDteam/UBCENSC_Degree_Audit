@@ -115,8 +115,8 @@ export interface FacultyRequirementResult {
 export interface SpecializationRequirementResult {
   group_id: string
   requirement_area: string
-  option_id: OptionId
-  option_name: string
+  option_id: OptionId | null
+  option_name: string | null
   theme?: string
   label: string
   rule_type: string
