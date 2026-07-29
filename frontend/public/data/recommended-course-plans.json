@@ -204,10 +204,6 @@
                     "year_taken": 3
                 },
                 {
-                    "course_code": "ENVR410",
-                    "year_taken": 4
-                },
-                {
                     "course_code": "ENVR449",
                     "year_taken": 4
                 },
@@ -493,10 +489,6 @@
                 },
                 {
                     "course_code": "ENVR450",
-                    "year_taken": 4
-                },
-                {
-                    "course_code": "ENVR410",
                     "year_taken": 4
                 }
             ],
