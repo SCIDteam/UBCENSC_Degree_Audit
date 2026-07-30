@@ -204,6 +204,9 @@ export default function PlannerScreen({
   onUpdateAttempt,
   onDeleteAttempt,
   onBack,
+  onRunAudit,
+  auditError,
+  onDismissAuditError,
 }: {
   profile: StudentSetupProfile
   attempts: CourseAttempt[]
@@ -211,6 +214,9 @@ export default function PlannerScreen({
   onUpdateAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
   onBack: () => void
+  onRunAudit: () => void
+  auditError: string | null
+  onDismissAuditError: () => void
 }) {
   const [expanded, setExpanded] = useState<Set<PlannerYear>>(new Set([1]))
   const [editingAttempt, setEditingAttempt] = useState<CourseAttempt | null>(null)
@@ -363,8 +369,8 @@ export default function PlannerScreen({
             </button>
             <button
               type="button"
-              disabled
-              className="font-heading cursor-not-allowed rounded-md bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground"
+              onClick={onRunAudit}
+              className="font-heading rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               Run Audit
             </button>
@@ -376,6 +382,19 @@ export default function PlannerScreen({
         <CourseSearchPanel ref={searchPanelRef} onSelectCourse={handleSelectCourse} />
 
         <main className="min-w-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
+          {auditError && (
+            <div className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+              <span>{auditError}</span>
+              <button
+                type="button"
+                onClick={onDismissAuditError}
+                aria-label="Dismiss message"
+                className="flex-shrink-0 rounded p-0.5 text-destructive transition-colors hover:bg-destructive/10"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
           {blockedNotice && (
             <div className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
               <span>{blockedNotice}</span>
