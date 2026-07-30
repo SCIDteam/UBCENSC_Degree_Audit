@@ -16,6 +16,8 @@ function isCatalogueCourse(value: unknown): value is CatalogueCourse {
     typeof course.is_arts_credit === 'boolean' &&
     typeof course.is_upper_level === 'boolean' &&
     isStringArray(course.breadth_categories) &&
+    typeof course.is_communication_course === 'boolean' &&
+    typeof course.is_lab_course === 'boolean' &&
     isStringArray(course.classification_notes)
   )
 }

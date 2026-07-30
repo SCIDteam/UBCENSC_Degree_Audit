@@ -302,6 +302,8 @@ export default function PlannerScreen({
       year_taken: year,
       term_taken: term,
       source: 'manual',
+      is_communication_course: course.is_communication_course,
+      is_lab_course: course.is_lab_course,
     })
     setExpanded((prev) => new Set(prev).add(year))
 

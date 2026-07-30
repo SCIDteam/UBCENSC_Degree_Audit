@@ -36,10 +36,20 @@ def load_breadth_rules() -> pd.DataFrame:
     return pd.read_csv(path).fillna("")
 
 
+def load_faculty_requirement_courses() -> pd.DataFrame:
+    path = os.path.join(
+        FACULTY_REQUIREMENTS_DIR,
+        "faculty_requirement_courses.csv",
+    )
+
+    return pd.read_csv(path).fillna("")
+
+
 def classify_catalogue_course(
     row: dict[str, Any],
     classification_rules: pd.DataFrame,
     breadth_rules: pd.DataFrame,
+    faculty_requirement_courses: pd.DataFrame,
 ) -> dict[str, Any]:
     """
     Classify a single catalogue course using the same Faculty rule
@@ -63,6 +73,19 @@ def classify_catalogue_course(
         classification_row, breadth_rules
     )
 
+    faculty_requirement_matches = classification_core.get_faculty_requirement_matches(
+        classification_row,
+        faculty_requirement_courses,
+        program="ENSC",
+        calendar_year="ALL",
+        program_type="ALL",
+    )
+    matched_requirement_ids = classification_core.split_requirement_matches(
+        faculty_requirement_matches
+    )
+    is_communication_course = "COMMUNICATION" in matched_requirement_ids
+    is_lab_course = "LAB_REQUIREMENT" in matched_requirement_ids
+
     notes: list[str] = []
 
     if is_science_credit:
@@ -81,6 +104,8 @@ def classify_catalogue_course(
             row["course_level"]
         ),
         "breadth_categories": breadth_categories,
+        "is_communication_course": is_communication_course,
+        "is_lab_course": is_lab_course,
         "classification_notes": notes,
     }
 
@@ -552,6 +577,7 @@ def build_course_catalogue(
     cleaned_df: pd.DataFrame,
     classification_rules: pd.DataFrame,
     breadth_rules: pd.DataFrame,
+    faculty_requirement_courses: pd.DataFrame,
 ) -> list[dict[str, Any]]:
     courses_json: list[dict[str, Any]] = []
 
@@ -592,6 +618,7 @@ def build_course_catalogue(
                 course_entry,
                 classification_rules,
                 breadth_rules,
+                faculty_requirement_courses,
             )
         )
 
@@ -645,6 +672,7 @@ if __name__ == "__main__":
         cleaned_dataframe,
         classification_rules=load_classification_rules(),
         breadth_rules=load_breadth_rules(),
+        faculty_requirement_courses=load_faculty_requirement_courses(),
     )
 
     generated_output_path = write_catalogue(

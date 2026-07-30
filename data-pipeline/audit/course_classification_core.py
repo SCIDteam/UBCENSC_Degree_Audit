@@ -215,3 +215,183 @@ def get_breadth_categories(row, breadth_rules) -> list[str]:
                 categories.append(category)
 
     return categories
+
+
+# ------------------------------------------------------------------
+# Faculty requirement course mappings
+# ------------------------------------------------------------------
+
+
+def normalize_mapping_course_code(value: str) -> str:
+    """
+    Normalize a course code from faculty_requirement_courses.csv.
+
+    Preserves:
+    - wildcards like HGSE*
+    - subject-only mappings like WRCM
+    """
+
+    text = str(value).strip().upper()
+
+    if not text:
+        return ""
+
+    if text.endswith("*"):
+        return text.replace(" ", "").replace("_V", "")
+
+    # Try normal course normalization first.
+    match = re.search(
+        r"\b([A-Z]{2,5})_?V?\s*[-_]?\s*(\d{3}[A-Z]?)\b",
+        text
+    )
+
+    if match:
+        return f"{match.group(1)}{match.group(2)}"
+
+    # If no course number is present, treat as subject-only.
+    return text.replace(" ", "").replace("_V", "")
+
+
+def faculty_requirement_course_matches(row, mapping) -> bool:
+    """
+    Check whether a student course matches one row from faculty_requirement_courses.csv.
+    """
+
+    student_course = str(
+        row.get("effective_course_code", "")
+    ).strip().upper()
+
+    student_subject = str(
+        row.get("subject", "")
+    ).strip().upper()
+
+    mapped_course = str(
+        mapping.get("course_code", "")
+    ).strip().upper()
+
+    if not student_course or not mapped_course:
+        return False
+
+    normalized_mapped_course = normalize_mapping_course_code(mapped_course)
+
+    # Wildcard, e.g. HGSE*
+    if normalized_mapped_course.endswith("*"):
+        prefix = normalized_mapped_course.replace("*", "")
+        return student_course.startswith(prefix)
+
+    # Exact course match, e.g. SCIE113
+    if normalized_mapped_course == student_course:
+        return True
+
+    # Subject-only match, e.g. WRCM
+    # This is useful if a mapping row intentionally names a subject rather
+    # than a specific course number.
+    if not any(char.isdigit() for char in normalized_mapped_course):
+        return student_subject == normalized_mapped_course
+
+    return False
+
+
+def get_relevant_faculty_requirement_courses(
+    faculty_requirement_courses: pd.DataFrame,
+    program: str,
+    calendar_year: str,
+    program_type: str,
+) -> pd.DataFrame:
+    """
+    Filter faculty_requirement_courses.csv by program / calendar_year / program_type.
+
+    Rows with ALL are treated as global.
+    """
+
+    df = faculty_requirement_courses.copy()
+
+    if df.empty:
+        return df
+
+    required_columns = [
+        "program",
+        "calendar_year",
+        "program_type",
+    ]
+
+    for column in required_columns:
+        if column not in df.columns:
+            df[column] = "ALL"
+
+    normalized_program = str(program).strip().upper()
+    normalized_calendar_year = str(calendar_year).strip()
+    normalized_program_type = str(program_type).strip().upper()
+
+    df["program"] = df["program"].astype(str).str.strip().str.upper()
+    df["calendar_year"] = df["calendar_year"].astype(str).str.strip()
+    df["program_type"] = df["program_type"].astype(str).str.strip().str.upper()
+
+    relevant = df[
+        ((df["program"] == normalized_program) | (df["program"] == "ALL"))
+        &
+        (
+            (df["calendar_year"] == normalized_calendar_year)
+            | (df["calendar_year"] == "ALL")
+        )
+        &
+        (
+            (df["program_type"] == normalized_program_type)
+            | (df["program_type"] == "ALL")
+        )
+    ].copy()
+
+    return relevant
+
+
+def get_faculty_requirement_matches(
+    row,
+    faculty_requirement_courses: pd.DataFrame,
+    program: str,
+    calendar_year: str,
+    program_type: str,
+) -> str:
+    """
+    Return semicolon-separated Faculty requirement IDs satisfied by this course.
+
+    Uses faculty_requirement_courses.csv.
+
+    Example:
+    SCIE113 -> COMMUNICATION
+    ENVR200 -> COMMUNICATION
+    CHEM121 -> LAB_REQUIREMENT
+    """
+
+    if faculty_requirement_courses.empty:
+        return ""
+
+    mappings = get_relevant_faculty_requirement_courses(
+        faculty_requirement_courses, program, calendar_year, program_type
+    )
+
+    if mappings.empty:
+        return ""
+
+    matched_requirement_ids = []
+
+    for _, mapping in mappings.iterrows():
+        if faculty_requirement_course_matches(row, mapping):
+            requirement_id = str(
+                mapping.get("requirement_id", "")
+            ).strip().upper()
+
+            if requirement_id and requirement_id not in matched_requirement_ids:
+                matched_requirement_ids.append(requirement_id)
+
+    return ";".join(matched_requirement_ids)
+
+
+def split_requirement_matches(value) -> list[str]:
+    if value is None:
+        return []
+
+    return [
+        item.strip().upper()
+        for item in str(value).split(";")
+        if item.strip()
+    ]

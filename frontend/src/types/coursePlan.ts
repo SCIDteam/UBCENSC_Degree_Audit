@@ -21,6 +21,8 @@ export type CourseAttempt = {
   year_taken: PlannerYear
   term_taken: PlannerTerm
   source: 'manual' | 'synthetic'
+  is_communication_course: boolean
+  is_lab_course: boolean
 }
 
 export type CourseAddedToast = {
