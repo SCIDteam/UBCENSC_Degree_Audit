@@ -3,28 +3,38 @@ import type { AuditRequirementStatus } from '../../types/audit'
 
 const STATUS_CONFIG: Record<
   AuditRequirementStatus,
-  { label: string; icon: typeof CheckCircle2; className: string }
+  { label: string; icon: typeof CheckCircle2; className: string; cardBorderClassName: string }
 > = {
   satisfied: {
     label: 'Satisfied',
     icon: CheckCircle2,
     className: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    cardBorderClassName: 'border-emerald-200',
   },
   partial: {
     label: 'Partial',
     icon: AlertTriangle,
     className: 'border-amber-200 bg-amber-50 text-amber-700',
+    cardBorderClassName: 'border-amber-200',
   },
   missing: {
     label: 'Missing',
     icon: XCircle,
     className: 'border-red-200 bg-red-50 text-destructive',
+    cardBorderClassName: 'border-red-200',
   },
   not_applicable: {
     label: 'Not applicable',
     icon: MinusCircle,
     className: 'border-border bg-muted text-muted-foreground',
+    cardBorderClassName: 'border-border',
   },
+}
+
+// Full-card border color so a card's status reads at a glance without a
+// saturated background; text/icon labeling still carries the actual meaning.
+export function getStatusCardBorderClass(status: AuditRequirementStatus): string {
+  return STATUS_CONFIG[status].cardBorderClassName
 }
 
 interface RequirementStatusBadgeProps {
