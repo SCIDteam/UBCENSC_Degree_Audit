@@ -3,6 +3,7 @@ import { BookOpen } from 'lucide-react'
 import { academicYears, concentrations, programs } from '../data/setupOptions'
 import type { StudentSetupProfile } from '../types/studentProfile'
 import type { AuditInput, AuditResult } from '../types/audit'
+import FacultyRequirements from '../components/audit/FacultyRequirements'
 
 type AuditTab = 'faculty' | 'specialization' | 'promotion'
 
@@ -66,8 +67,7 @@ export default function AuditScreen({ profile, auditResult, onEditPlan }: AuditS
   const requirementsNeedingAttention =
     faculty.partial + faculty.missing + specialization.partial + specialization.missing
 
-  const tabPlaceholders: Record<AuditTab, string> = {
-    faculty: 'Faculty requirement details will appear here.',
+  const tabPlaceholders: Record<Exclude<AuditTab, 'faculty'>, string> = {
     specialization: 'Specialization requirement details will appear here.',
     promotion: 'Promotion requirement details will appear here.',
   }
@@ -145,8 +145,12 @@ export default function AuditScreen({ profile, auditResult, onEditPlan }: AuditS
                 </button>
               ))}
             </div>
-            <div role="tabpanel" className="p-4 text-[12px] text-muted-foreground">
-              {tabPlaceholders[activeTab]}
+            <div role="tabpanel" className="p-4">
+              {activeTab === 'faculty' ? (
+                <FacultyRequirements auditResult={auditResult} />
+              ) : (
+                <div className="text-[12px] text-muted-foreground">{tabPlaceholders[activeTab]}</div>
+              )}
             </div>
           </div>
         </main>
