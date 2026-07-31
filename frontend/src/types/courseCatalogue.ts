@@ -20,5 +20,7 @@ export type CatalogueCourse = {
   is_arts_credit: boolean;
   is_upper_level: boolean;
   breadth_categories: string[];
+  is_communication_course: boolean;
+  is_lab_course: boolean;
   classification_notes: string[];
 };

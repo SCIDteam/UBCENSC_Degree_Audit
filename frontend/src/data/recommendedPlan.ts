@@ -131,6 +131,8 @@ export async function buildRecommendedAttempts(
       year_taken: entry.year_taken as PlannerYear,
       term_taken: mapFirstTermOffered(catalogueCourse.terms_offered),
       source: 'synthetic',
+      is_communication_course: catalogueCourse.is_communication_course,
+      is_lab_course: catalogueCourse.is_lab_course,
     })
   }
 
