@@ -4,6 +4,7 @@ import { academicYears, concentrations, programs } from '../data/setupOptions'
 import type { StudentSetupProfile } from '../types/studentProfile'
 import type { AuditInput, AuditResult } from '../types/audit'
 import FacultyRequirements from '../components/audit/FacultyRequirements'
+import SpecializationRequirements from '../components/audit/SpecializationRequirements'
 
 type AuditTab = 'faculty' | 'specialization' | 'promotion'
 
@@ -67,8 +68,7 @@ export default function AuditScreen({ profile, auditResult, onEditPlan }: AuditS
   const requirementsNeedingAttention =
     faculty.partial + faculty.missing + specialization.partial + specialization.missing
 
-  const tabPlaceholders: Record<Exclude<AuditTab, 'faculty'>, string> = {
-    specialization: 'Specialization requirement details will appear here.',
+  const tabPlaceholders: Record<Exclude<AuditTab, 'faculty' | 'specialization'>, string> = {
     promotion: 'Promotion requirement details will appear here.',
   }
 
@@ -148,6 +148,8 @@ export default function AuditScreen({ profile, auditResult, onEditPlan }: AuditS
             <div role="tabpanel" className="p-4">
               {activeTab === 'faculty' ? (
                 <FacultyRequirements auditResult={auditResult} />
+              ) : activeTab === 'specialization' ? (
+                <SpecializationRequirements auditResult={auditResult} />
               ) : (
                 <div className="text-[12px] text-muted-foreground">{tabPlaceholders[activeTab]}</div>
               )}
