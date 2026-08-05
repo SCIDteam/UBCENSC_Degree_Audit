@@ -117,22 +117,14 @@ export async function buildRecommendedAttempts(
     const isCompleted = entry.year_taken <= academic_year
 
     attempts.push({
+      ...catalogueCourse,
       attempt_id: crypto.randomUUID(),
-      course_code: catalogueCourse.course_code,
-      display_code: catalogueCourse.display_code,
-      subject: catalogueCourse.subject,
-      course_number: catalogueCourse.course_number,
-      course_level: catalogueCourse.course_level,
-      course_title: catalogueCourse.course_title,
-      credits: catalogueCourse.credits,
       status: isCompleted ? 'completed' : 'planned',
       grade: isCompleted ? 'P' : '',
       percentage: null,
       year_taken: entry.year_taken as PlannerYear,
       term_taken: mapFirstTermOffered(catalogueCourse.terms_offered),
       source: 'synthetic',
-      is_communication_course: catalogueCourse.is_communication_course,
-      is_lab_course: catalogueCourse.is_lab_course,
     })
   }
 
