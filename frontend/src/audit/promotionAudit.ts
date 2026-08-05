@@ -11,6 +11,7 @@ import type {
 } from '../types/audit'
 
 interface PromotionAuditorProps {
+    promotion_target_year: number | null,
     classified_courses: CatalogueCourse[]
     promotionRules: PromotionRules[]
     student_course_plan: CourseAttempt[]
@@ -31,14 +32,13 @@ interface RecordPromotionProps {
 }
 
 export function PromotionAuditor({
+    promotion_target_year,
     promotionRules,
     student_course_plan,
     student_profile
 } : PromotionAuditorProps) {
     const promotion_requirement_results : PromotionRequirementResult[] = []
 
-    // promotion to = academic year + 1
-    const promotion_to = getPromotionTargetYear(Number(student_profile.academic_year))
     // TEMPORARY - NEED TO FIGURE OUT PURPOSE
     const matched_courses: string[] = [];
     const requirement_area = 'Promotion';
@@ -56,7 +56,7 @@ export function PromotionAuditor({
 
             promotion_requirement_results.push(
                 createPromotionRequirementResult({
-                    promotion_to: String(promotion_to),
+                    promotion_to: String(promotion_target_year),
                     rule_id: rule.id,
                     requirement_area: requirement_area,
                     // TODO: Change to user-friendly label
@@ -82,7 +82,7 @@ export function PromotionAuditor({
 
             promotion_requirement_results.push(
                 createPromotionRequirementResult({
-                    promotion_to: String(promotion_to),
+                    promotion_to: String(promotion_target_year),
                     rule_id: rule.id,
                     requirement_area: requirement_area,
                     // TODO: Change to user-friendly label
@@ -108,7 +108,7 @@ export function PromotionAuditor({
 
             promotion_requirement_results.push(
                 createPromotionRequirementResult({
-                    promotion_to: String(promotion_to),
+                    promotion_to: String(promotion_target_year),
                     rule_id: rule.id,
                     requirement_area: requirement_area,
                     // TODO: Change to user-friendly label
@@ -134,7 +134,7 @@ export function PromotionAuditor({
 
             promotion_requirement_results.push(
                 createPromotionRequirementResult({
-                    promotion_to: String(promotion_to),
+                    promotion_to: String(promotion_target_year),
                     rule_id: rule.id,
                     requirement_area: requirement_area,
                     // TODO: Change to user-friendly label
@@ -160,7 +160,7 @@ export function PromotionAuditor({
 
             promotion_requirement_results.push(
                 createPromotionRequirementResult({
-                    promotion_to: String(promotion_to),
+                    promotion_to: String(promotion_target_year),
                     rule_id: rule.id,
                     requirement_area: requirement_area,
                     // TODO: Change to user-friendly label
@@ -186,7 +186,7 @@ export function PromotionAuditor({
 
             promotion_requirement_results.push(
                 createPromotionRequirementResult({
-                    promotion_to: String(promotion_to),
+                    promotion_to: String(promotion_target_year),
                     rule_id: rule.id,
                     requirement_area: requirement_area,
                     // TODO: Change to user-friendly label
@@ -212,7 +212,7 @@ export function PromotionAuditor({
 
             promotion_requirement_results.push(
                 createPromotionRequirementResult({
-                    promotion_to: String(promotion_to),
+                    promotion_to: String(promotion_target_year),
                     rule_id: rule.id,
                     requirement_area: requirement_area,
                     // TODO: Change to user-friendly label
@@ -229,13 +229,6 @@ export function PromotionAuditor({
     });
 
     return promotion_requirement_results;
-}
-
-function getPromotionTargetYear(academic_year : number) {
-    if (academic_year === null || academic_year === 4) {
-        return null;
-    }
-    return academic_year+1
 }
 
 function createPromotionRequirementResult({
