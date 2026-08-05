@@ -34,8 +34,7 @@ interface RecordPromotionProps {
 export function PromotionAuditor({
     promotion_target_year,
     promotionRules,
-    student_course_plan,
-    student_profile
+    student_course_plan
 } : PromotionAuditorProps) {
     const promotion_requirement_results : PromotionRequirementResult[] = []
 
