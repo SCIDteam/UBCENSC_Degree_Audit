@@ -358,7 +358,7 @@ const studentProfile: StudentSetupProfile = {
   program: 'ENSC',
   program_type: 'Major',
   option_id: '',
-  academic_year: 4,
+  academic_year: 3,
 };
 
 const result = RunAudit({
