@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import type { AuditProgressUnit, AuditRequirementStatus, AuditResult, FacultyRequirementResult } from '../../types/audit'
-import RequirementStatusBadge, { getStatusCardBorderClass } from './RequirementStatusBadge'
+import RequirementStatusBadge from './RequirementStatusBadge'
+import { getStatusCardBorderClass } from './auditStatusStyles'
 
 // Tim's Faculty audit treats this requirement as a maximum, not a deficiency,
 // so it gets "used / Maximum / remaining under limit" wording instead of the
