@@ -79,11 +79,11 @@ export interface AuditRequirementCountSummary {
 
 export interface AuditCaseSummary {
   case_id: string
-  calendar_year: CalendarYear
-  program: ProgramCode
-  program_type: ProgramType
-  option_id: OptionId
-  academic_year: AcademicYearValue
+  calendar_year: CalendarYear | ''
+  program: ProgramCode | ''
+  program_type: ProgramType | ''
+  option_id: OptionId | ''
+  academic_year: AcademicYearValue | ''
   audit_mode: AuditMode
   counted_statuses: StoredCourseStatus[]
   counted_credits: number
