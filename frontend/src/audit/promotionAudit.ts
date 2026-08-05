@@ -340,12 +340,14 @@ function AuditPromotionMinScienceCreditsAtOrAboveLevel(
     const required_science_credits_at_or_above_level = rule?.value ?? 0;
 
     const level_min = rule?.course_level_min ?? 0;
+    const level_max = rule?.course_level_max ?? 0;
 
     // TODO: Verify logic
     const total_science_credits_at_or_above_level = student_course_plan
         .filter((course) => {
             course.is_science_credit && 
-            course.course_number >= level_min
+            course.course_number >= level_min &&
+            course.course_number <= level_max
         })
         .reduce((accm, cur) => accm + cur.credits, 0);
 
