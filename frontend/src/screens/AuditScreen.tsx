@@ -6,13 +6,15 @@ import type { AuditInput, AuditResult } from '../types/audit'
 import FacultyRequirements from '../components/audit/FacultyRequirements'
 import SpecializationRequirements from '../components/audit/SpecializationRequirements'
 import PromotionRequirements from '../components/audit/PromotionRequirements'
+import CourseAllocationTable from '../components/audit/CourseAllocationTable'
 
-type AuditTab = 'faculty' | 'specialization' | 'promotion'
+type AuditTab = 'faculty' | 'specialization' | 'promotion' | 'allocation'
 
 const AUDIT_TABS: { id: AuditTab; label: string }[] = [
   { id: 'faculty', label: 'Faculty' },
   { id: 'specialization', label: 'Specialization' },
   { id: 'promotion', label: 'Promotion' },
+  { id: 'allocation', label: 'Course Allocation' },
 ]
 
 function resolveProgramLabel(code: StudentSetupProfile['program']) {
@@ -147,8 +149,10 @@ export default function AuditScreen({ profile, auditResult, onEditPlan }: AuditS
                 <FacultyRequirements auditResult={auditResult} />
               ) : activeTab === 'specialization' ? (
                 <SpecializationRequirements auditResult={auditResult} />
-              ) : (
+              ) : activeTab === 'promotion' ? (
                 <PromotionRequirements auditResult={auditResult} />
+              ) : (
+                <CourseAllocationTable auditResult={auditResult} />
               )}
             </div>
           </div>
