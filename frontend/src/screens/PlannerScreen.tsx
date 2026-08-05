@@ -288,22 +288,14 @@ export default function PlannerScreen({
     const attemptId = crypto.randomUUID()
 
     onAddAttempt({
+      ...course,
       attempt_id: attemptId,
-      course_code: course.course_code,
-      display_code: course.display_code,
-      subject: course.subject,
-      course_number: course.course_number,
-      course_level: course.course_level,
-      course_title: course.course_title,
-      credits: course.credits,
       status: 'completed',
       grade: 'P',
       percentage: null,
       year_taken: year,
       term_taken: term,
-      source: 'manual',
-      is_communication_course: course.is_communication_course,
-      is_lab_course: course.is_lab_course,
+      source: 'manual'
     })
     setExpanded((prev) => new Set(prev).add(year))
 
