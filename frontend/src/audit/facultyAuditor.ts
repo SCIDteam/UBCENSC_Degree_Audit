@@ -1,10 +1,8 @@
 import type { CatalogueCourse } from '../types/courseCatalogue'
 import type { CourseAttempt } from '../types/coursePlan'
 import type { StudentSetupProfile } from '../types/studentProfile'
-import type { 
-    // CourseRules, 
-    FacultyRequirements, 
-    // PromotionRules,
+import type {
+    FacultyRequirements,
     CourseRequirements
 } from '../types/auditRules'
 import type { 
@@ -152,10 +150,70 @@ export function FacultyAuditor({
     )
 
     // Breadth Requirements
+    const {
+        min_breadth_categories, 
+        completed, 
+        min_breadth_categories_notes 
+     } = AuditScienceBreadth(
+        facultyRequirementLookup,
+        student_course_plan
+    )
+    facult_requirement_results.push(
+        createFacultyRequirementResult({
+            requirement_id: "SCIENCE_BREADTH",
+            requirement_area: "Faculty Requirement",
+            label: "Faculty Breadth Categories",
+            completed: completed,
+            required: min_breadth_categories,
+            unit: "categories",
+            matched_courses: matched_courses,
+            notes: min_breadth_categories_notes
+        })
+    )
 
     // Lab Requirements
+    const {
+        min_lab_courses_required, 
+        num_lab_courses, 
+        lab_requirement_notes
+    } = AuditLabRequirement(
+        facultyRequirementLookup,
+        student_course_plan
+    )
+    facult_requirement_results.push(
+        createFacultyRequirementResult({
+            requirement_id: "LAB_REQUIREMENT",
+            requirement_area: "Faculty Requirement",
+            label: "Faculty Communication Credits",
+            completed: num_lab_courses,
+            required: min_lab_courses_required,
+            unit: "course",
+            matched_courses: matched_courses,
+            notes: lab_requirement_notes
+        })
+    )
 
     // Communication Requirements
+    const {
+        min_communication_credits, 
+        communication_credits, 
+        communication_notes
+    } = AuditCommunicationRequirement(
+        facultyRequirementLookup,
+        student_course_plan
+    )
+    facult_requirement_results.push(
+        createFacultyRequirementResult({
+            requirement_id: "COMMUNICATION",
+            requirement_area: "Faculty Requirement",
+            label: "Faculty Communication Credits",
+            completed: communication_credits,
+            required: min_communication_credits,
+            unit: "credits",
+            matched_courses: matched_courses,
+            notes: communication_notes
+        })
+    )
 
     return facult_requirement_results;
 }
@@ -295,4 +353,69 @@ function AuditUpperLevelScience(
         `current program type is ${student_profile.program_type}.`
 
     return {upper_level_science_required, upper_level_science_credits, upper_level_science_notes}
+}
+
+function AuditScienceBreadth(
+    facultyRequirementLookup: Record<string, FacultyRequirements>,
+    student_course_plan: CourseAttempt[]
+) {
+    // Resolve minimum science-breadth categories.
+    const min_breadth_categories = facultyRequirementLookup.min_breadth_categories?.value ?? 0;
+
+    const category_credit_totals = student_course_plan.reduce((accm, cur) => {
+        cur.breadth_categories.forEach((category) => {
+            if (!accm[category]) {
+                accm[category] = 0;
+            }
+            accm[category] += cur.credits;
+        })
+        return accm;
+    }, {} as Record<string, number>);
+
+    const completed_categories = Object.entries(category_credit_totals)
+        .filter(([_, credits]) => credits >= 3)
+        .map(([category, _]) => category);
+
+    const sorted_completed_categories = [...completed_categories].sort((a, b) => a.localeCompare(b));
+
+    const min_breadth_categories_notes = 
+        `Completed categories with at least 3 credits: ` +
+        `${sorted_completed_categories.join(', ')}`
+    const completed = completed_categories.length;
+
+    return {min_breadth_categories, completed, min_breadth_categories_notes}
+}
+
+function AuditLabRequirement(
+    facultyRequirementLookup: Record<string, FacultyRequirements>,
+    student_course_plan: CourseAttempt[]
+) {
+    // Resolve lab requirement courses.
+    const min_lab_courses_required = facultyRequirementLookup.one_course_from_list?.value ?? 0;
+
+    const num_lab_courses = student_course_plan
+        .filter((course) => course.is_lab_course)
+        .length
+
+    const lab_requirement_notes = 
+        `Satisfied if at least one laboratory science course is counted.`
+
+    return {min_lab_courses_required, num_lab_courses, lab_requirement_notes}
+}
+
+function AuditCommunicationRequirement(
+    facultyRequirementLookup: Record<string, FacultyRequirements>,
+    student_course_plan: CourseAttempt[]
+) {
+    // Resolve upper-level credits.
+    const min_communication_credits = facultyRequirementLookup.min_communication_credits?.value ?? 0;
+
+    const communication_credits = student_course_plan
+        .filter((course) => course.is_communication_course)
+        .reduce((accm, cur) => accm + cur.credits, 0)
+
+    const communication_notes = 
+        `Communication requirement satisfied by mapped communication courses.`
+
+    return {min_communication_credits, communication_credits, communication_notes}
 }
