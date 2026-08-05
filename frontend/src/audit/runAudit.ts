@@ -1,7 +1,7 @@
 import type { CatalogueCourse } from '../types/courseCatalogue'
 import type { CourseAttempt } from '../types/coursePlan'
 import type { StudentSetupProfile } from '../types/studentProfile'
-import type { AuditResult } from '../types/audit'
+// import type { AuditResult } from '../types/audit'
 
 import { FacultyAuditor } from './facultyAuditor'
 import { LoadRules } from './loadRules'
@@ -19,8 +19,8 @@ export function RunAudit({
 } : RunAuditProps) {
     const {
         facultyRequirements, 
-        courseRules, 
-        promotionRules,
+        // courseRules, 
+        // promotionRules,
         courseRequirements
     } = LoadRules();
 

@@ -2,9 +2,9 @@ import type { CatalogueCourse } from '../types/courseCatalogue'
 import type { CourseAttempt } from '../types/coursePlan'
 import type { StudentSetupProfile } from '../types/studentProfile'
 import type { 
-    CourseRules, 
+    // CourseRules, 
     FacultyRequirements, 
-    PromotionRules,
+    // PromotionRules,
     CourseRequirements
 } from '../types/auditRules'
 import type { 
