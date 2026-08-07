@@ -5,10 +5,10 @@ import type {
     FacultyRequirements,
     CourseRequirements
 } from '../types/auditRules'
-import type { 
-    FacultyRequirementResult, 
-    AuditProgressUnit, 
-    AuditRequirementStatus 
+import type {
+    FacultyRequirementResult,
+    AuditProgressUnit,
+    AuditRequirementStatus
 } from '../types/audit'
 
 interface FacultyAuditorProps {
@@ -31,12 +31,12 @@ interface RecordFacultyRequirementProps {
 }
 
 export function FacultyAuditor({
-    faculty_requirements, 
+    faculty_requirements,
     course_requirements,
     student_course_plan,
     student_profile
-} : FacultyAuditorProps) {
-    const facult_requirement_results : FacultyRequirementResult[] = []
+}: FacultyAuditorProps) {
+    const facult_requirement_results: FacultyRequirementResult[] = []
 
     const facultyRequirementLookup = Object.fromEntries(
         faculty_requirements.map(req => [
@@ -174,7 +174,7 @@ export function FacultyAuditor({
         completed,
         min_breadth_categories_notes,
         matched_courses: breadth_matched_courses
-     } = AuditScienceBreadth(
+    } = AuditScienceBreadth(
         facultyRequirementLookup,
         student_course_plan
     )
@@ -249,15 +249,15 @@ function createFacultyRequirementResult({
     unit,
     matched_courses,
     notes
-} : RecordFacultyRequirementProps) {
+}: RecordFacultyRequirementProps) {
     const getRequirementStatus = (required: number, completed: number): AuditRequirementStatus => {
         if (completed >= required) return "satisfied"
         if (completed > 0) return "partial"
         return "missing"
     }
 
-    const surplus = Math.max(completed-required, 0);
-    const remaining = Math.max(required-completed, 0);
+    const surplus = Math.max(completed - required, 0);
+    const remaining = Math.max(required - completed, 0);
 
     const total_credits_result: FacultyRequirementResult = {
         requirement_id: requirement_id,
@@ -326,7 +326,7 @@ function AuditTotalCredits(
         `specialization minimum=${specialization_minimum}; ` +
         `using required total=${required_credits}.`
 
-    return {required_credits, total_credits, total_notes, matched_courses}
+    return { required_credits, total_credits, total_notes, matched_courses }
 }
 
 function AuditScienceCredits(
@@ -345,7 +345,7 @@ function AuditScienceCredits(
 
     const sci_notes = `Science credits based on faculty course classification rules.`
 
-    return {science_required, total_science_credits, sci_notes, matched_courses}
+    return { science_required, total_science_credits, sci_notes, matched_courses }
 }
 
 function AuditArtsCredits(
@@ -364,7 +364,7 @@ function AuditArtsCredits(
 
     const arts_notes = `Arts credits based on faculty course classification rules.`
 
-    return {arts_required, total_arts_credits, arts_notes, matched_courses}
+    return { arts_required, total_arts_credits, arts_notes, matched_courses }
 }
 
 function AuditUpperLevelTotal(
@@ -383,7 +383,7 @@ function AuditUpperLevelTotal(
 
     const upper_level_notes = `Upper-level means 300-level or above.`
 
-    return {upper_level_required, upper_level_credits, upper_level_notes, matched_courses}
+    return { upper_level_required, upper_level_credits, upper_level_notes, matched_courses }
 }
 
 function AuditUpperLevelScience(
@@ -406,7 +406,7 @@ function AuditUpperLevelScience(
         `Upper-level Science requirement depends on program type;` +
         `current program type is ${student_profile.program_type}.`
 
-    return {upper_level_science_required, upper_level_science_credits, upper_level_science_notes, matched_courses}
+    return { upper_level_science_required, upper_level_science_credits, upper_level_science_notes, matched_courses }
 }
 
 function AuditScienceBreadth(
@@ -432,6 +432,16 @@ function AuditScienceBreadth(
 
     const sorted_completed_categories = [...completed_categories].sort((a, b) => a.localeCompare(b));
 
+    const completedCategorySet = new Set(completed_categories);
+
+    const matchedCourses = student_course_plan.filter((course) =>
+        course.breadth_categories.some((category) =>
+            completedCategorySet.has(category)
+        )
+    )
+
+    const matched_courses = uniqueCourseCodes(matchedCourses)
+
     const min_breadth_categories_notes =
         `Completed categories with at least 3 credits: ` +
         `${sorted_completed_categories.join(', ')}`
@@ -439,9 +449,9 @@ function AuditScienceBreadth(
 
     // Tim's Python implementation does not attribute breadth completion to
     // individual courses; matched_courses is always empty for this requirement.
-    const matched_courses: string[] = [];
+    // const matched_courses: string[] = [];
 
-    return {min_breadth_categories, completed, min_breadth_categories_notes, matched_courses}
+    return { min_breadth_categories, completed, min_breadth_categories_notes, matched_courses }
 }
 
 function AuditLabRequirement(
@@ -460,7 +470,7 @@ function AuditLabRequirement(
     const lab_requirement_notes =
         `Satisfied if at least one laboratory science course is counted.`
 
-    return {min_lab_courses_required, num_lab_courses, lab_requirement_notes, matched_courses}
+    return { min_lab_courses_required, num_lab_courses, lab_requirement_notes, matched_courses }
 }
 
 function AuditCommunicationRequirement(
@@ -480,5 +490,5 @@ function AuditCommunicationRequirement(
     const communication_notes =
         `Communication requirement satisfied by mapped communication courses.`
 
-    return {min_communication_credits, communication_credits, communication_notes, matched_courses}
+    return { min_communication_credits, communication_credits, communication_notes, matched_courses }
 }
