@@ -46,14 +46,17 @@ export function FacultyAuditor({
     );
 
     // Total Faculty Credits
-    const {required_credits, total_credits, total_notes} = AuditTotalCredits(
-        facultyRequirementLookup, 
+    const {
+        required_credits,
+        total_credits,
+        total_notes,
+        matched_courses: total_credits_matched_courses
+    } = AuditTotalCredits(
+        facultyRequirementLookup,
         course_requirements,
         student_profile,
         student_course_plan
     );
-    // TEMPORARY - NEED TO FIGURE OUT PURPOSE
-    const matched_courses: string[] = [];
 
     facult_requirement_results.push(
         createFacultyRequirementResult({
@@ -63,13 +66,18 @@ export function FacultyAuditor({
             completed: total_credits,
             required: required_credits,
             unit: "credits",
-            matched_courses: matched_courses,
+            matched_courses: total_credits_matched_courses,
             notes: total_notes
         })
     )
 
     // Total Science Credits
-    const {science_required, total_science_credits, sci_notes} = AuditScienceCredits(
+    const {
+        science_required,
+        total_science_credits,
+        sci_notes,
+        matched_courses: science_credits_matched_courses
+    } = AuditScienceCredits(
         facultyRequirementLookup,
         student_course_plan
     )
@@ -82,13 +90,18 @@ export function FacultyAuditor({
             completed: total_science_credits,
             required: science_required,
             unit: "credits",
-            matched_courses: matched_courses,
+            matched_courses: science_credits_matched_courses,
             notes: sci_notes
         })
     )
 
     // Total Arts Credits
-    const {arts_required, total_arts_credits, arts_notes} = AuditArtsCredits(
+    const {
+        arts_required,
+        total_arts_credits,
+        arts_notes,
+        matched_courses: arts_credits_matched_courses
+    } = AuditArtsCredits(
         facultyRequirementLookup,
         student_course_plan
     )
@@ -101,13 +114,18 @@ export function FacultyAuditor({
             completed: total_arts_credits,
             required: arts_required,
             unit: "credits",
-            matched_courses: matched_courses,
+            matched_courses: arts_credits_matched_courses,
             notes: arts_notes
         })
     )
 
     // Upper-level Credits
-    const {upper_level_required, upper_level_credits, upper_level_notes} = AuditUpperLevelTotal(
+    const {
+        upper_level_required,
+        upper_level_credits,
+        upper_level_notes,
+        matched_courses: upper_level_total_matched_courses
+    } = AuditUpperLevelTotal(
         facultyRequirementLookup,
         student_course_plan
     )
@@ -120,16 +138,17 @@ export function FacultyAuditor({
             completed: upper_level_credits,
             required: upper_level_required,
             unit: "credits",
-            matched_courses: matched_courses,
+            matched_courses: upper_level_total_matched_courses,
             notes: upper_level_notes
         })
     )
-    
+
     // Upper-level Science Credits
     const {
         upper_level_science_required,
-        upper_level_science_credits, 
-        upper_level_science_notes
+        upper_level_science_credits,
+        upper_level_science_notes,
+        matched_courses: upper_level_science_matched_courses
     } = AuditUpperLevelScience(
         facultyRequirementLookup,
         student_course_plan,
@@ -144,16 +163,17 @@ export function FacultyAuditor({
             completed: upper_level_science_credits,
             required: upper_level_science_required,
             unit: "credits",
-            matched_courses: matched_courses,
+            matched_courses: upper_level_science_matched_courses,
             notes: upper_level_science_notes
         })
     )
 
     // Breadth Requirements
     const {
-        min_breadth_categories, 
-        completed, 
-        min_breadth_categories_notes 
+        min_breadth_categories,
+        completed,
+        min_breadth_categories_notes,
+        matched_courses: breadth_matched_courses
      } = AuditScienceBreadth(
         facultyRequirementLookup,
         student_course_plan
@@ -166,16 +186,17 @@ export function FacultyAuditor({
             completed: completed,
             required: min_breadth_categories,
             unit: "categories",
-            matched_courses: matched_courses,
+            matched_courses: breadth_matched_courses,
             notes: min_breadth_categories_notes
         })
     )
 
     // Lab Requirements
     const {
-        min_lab_courses_required, 
-        num_lab_courses, 
-        lab_requirement_notes
+        min_lab_courses_required,
+        num_lab_courses,
+        lab_requirement_notes,
+        matched_courses: lab_matched_courses
     } = AuditLabRequirement(
         facultyRequirementLookup,
         student_course_plan
@@ -188,16 +209,17 @@ export function FacultyAuditor({
             completed: num_lab_courses,
             required: min_lab_courses_required,
             unit: "course",
-            matched_courses: matched_courses,
+            matched_courses: lab_matched_courses,
             notes: lab_requirement_notes
         })
     )
 
     // Communication Requirements
     const {
-        min_communication_credits, 
-        communication_credits, 
-        communication_notes
+        min_communication_credits,
+        communication_credits,
+        communication_notes,
+        matched_courses: communication_matched_courses
     } = AuditCommunicationRequirement(
         facultyRequirementLookup,
         student_course_plan
@@ -210,7 +232,7 @@ export function FacultyAuditor({
             completed: communication_credits,
             required: min_communication_credits,
             unit: "credits",
-            matched_courses: matched_courses,
+            matched_courses: communication_matched_courses,
             notes: communication_notes
         })
     )
@@ -254,6 +276,20 @@ function createFacultyRequirementResult({
     return total_credits_result
 }
 
+function uniqueCourseCodes(courses: CourseAttempt[]): string[] {
+    const seen = new Set<string>();
+    const codes: string[] = [];
+
+    for (const course of courses) {
+        if (!seen.has(course.course_code)) {
+            seen.add(course.course_code);
+            codes.push(course.course_code);
+        }
+    }
+
+    return codes;
+}
+
 function AuditTotalCredits(
     facultyRequirementLookup: Record<string, FacultyRequirements>,
     courseRequirements: CourseRequirements[],
@@ -276,16 +312,21 @@ function AuditTotalCredits(
         specialization_minimum?.value ?? 0
     );
 
-    const total_credits = student_course_plan.reduce(
+    // All counted courses contribute to total credits.
+    const matchedCourses = student_course_plan;
+
+    const total_credits = matchedCourses.reduce(
         (accm, cur) => accm + cur.credits, 0
     );
 
-    const total_notes = 
+    const matched_courses = uniqueCourseCodes(matchedCourses);
+
+    const total_notes =
         `Faculty minimum=${faculty_minimum}; ` +
         `specialization minimum=${specialization_minimum}; ` +
         `using required total=${required_credits}.`
 
-    return {required_credits, total_credits, total_notes}
+    return {required_credits, total_credits, total_notes, matched_courses}
 }
 
 function AuditScienceCredits(
@@ -295,13 +336,16 @@ function AuditScienceCredits(
     // Resolve science credits.
     const science_required = facultyRequirementLookup.min_science_credits?.value ?? 0;
 
-    const total_science_credits = student_course_plan
-        .filter((course) => course.is_science_credit)
+    const matchedCourses = student_course_plan.filter((course) => course.is_science_credit)
+
+    const total_science_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0)
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const sci_notes = `Science credits based on faculty course classification rules.`
 
-    return {science_required, total_science_credits, sci_notes}
+    return {science_required, total_science_credits, sci_notes, matched_courses}
 }
 
 function AuditArtsCredits(
@@ -311,13 +355,16 @@ function AuditArtsCredits(
     // Resolve arts credits.
     const arts_required = facultyRequirementLookup.min_arts_credits?.value ?? 0;
 
-    const total_arts_credits = student_course_plan
-        .filter((course) => course.is_arts_credit)
+    const matchedCourses = student_course_plan.filter((course) => course.is_arts_credit)
+
+    const total_arts_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0)
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const arts_notes = `Arts credits based on faculty course classification rules.`
 
-    return {arts_required, total_arts_credits, arts_notes}
+    return {arts_required, total_arts_credits, arts_notes, matched_courses}
 }
 
 function AuditUpperLevelTotal(
@@ -327,13 +374,16 @@ function AuditUpperLevelTotal(
     // Resolve upper-level credits.
     const upper_level_required = facultyRequirementLookup.min_upper_level_credits?.value ?? 0;
 
-    const upper_level_credits = student_course_plan
-        .filter((course) => course.is_upper_level)
+    const matchedCourses = student_course_plan.filter((course) => course.is_upper_level)
+
+    const upper_level_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0)
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const upper_level_notes = `Upper-level means 300-level or above.`
 
-    return {upper_level_required, upper_level_credits, upper_level_notes}
+    return {upper_level_required, upper_level_credits, upper_level_notes, matched_courses}
 }
 
 function AuditUpperLevelScience(
@@ -344,15 +394,19 @@ function AuditUpperLevelScience(
     // Resolve upper-level credits.
     const upper_level_science_required = facultyRequirementLookup.min_upper_level_science_credits?.value ?? 0;
 
-    const upper_level_science_credits = student_course_plan
+    const matchedCourses = student_course_plan
         .filter((course) => course.is_upper_level && course.is_science_credit)
+
+    const upper_level_science_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0)
 
-    const upper_level_science_notes = 
+    const matched_courses = uniqueCourseCodes(matchedCourses);
+
+    const upper_level_science_notes =
         `Upper-level Science requirement depends on program type;` +
         `current program type is ${student_profile.program_type}.`
 
-    return {upper_level_science_required, upper_level_science_credits, upper_level_science_notes}
+    return {upper_level_science_required, upper_level_science_credits, upper_level_science_notes, matched_courses}
 }
 
 function AuditScienceBreadth(
@@ -378,12 +432,16 @@ function AuditScienceBreadth(
 
     const sorted_completed_categories = [...completed_categories].sort((a, b) => a.localeCompare(b));
 
-    const min_breadth_categories_notes = 
+    const min_breadth_categories_notes =
         `Completed categories with at least 3 credits: ` +
         `${sorted_completed_categories.join(', ')}`
     const completed = completed_categories.length;
 
-    return {min_breadth_categories, completed, min_breadth_categories_notes}
+    // Tim's Python implementation does not attribute breadth completion to
+    // individual courses; matched_courses is always empty for this requirement.
+    const matched_courses: string[] = [];
+
+    return {min_breadth_categories, completed, min_breadth_categories_notes, matched_courses}
 }
 
 function AuditLabRequirement(
@@ -393,14 +451,16 @@ function AuditLabRequirement(
     // Resolve lab requirement courses.
     const min_lab_courses_required = facultyRequirementLookup.one_course_from_list?.value ?? 0;
 
-    const num_lab_courses = student_course_plan
-        .filter((course) => course.is_lab_course)
-        .length
+    const matchedCourses = student_course_plan.filter((course) => course.is_lab_course)
 
-    const lab_requirement_notes = 
+    const matched_courses = uniqueCourseCodes(matchedCourses);
+
+    const num_lab_courses = matched_courses.length
+
+    const lab_requirement_notes =
         `Satisfied if at least one laboratory science course is counted.`
 
-    return {min_lab_courses_required, num_lab_courses, lab_requirement_notes}
+    return {min_lab_courses_required, num_lab_courses, lab_requirement_notes, matched_courses}
 }
 
 function AuditCommunicationRequirement(
@@ -410,12 +470,15 @@ function AuditCommunicationRequirement(
     // Resolve upper-level credits.
     const min_communication_credits = facultyRequirementLookup.min_communication_credits?.value ?? 0;
 
-    const communication_credits = student_course_plan
-        .filter((course) => course.is_communication_course)
+    const matchedCourses = student_course_plan.filter((course) => course.is_communication_course)
+
+    const communication_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0)
 
-    const communication_notes = 
+    const matched_courses = uniqueCourseCodes(matchedCourses);
+
+    const communication_notes =
         `Communication requirement satisfied by mapped communication courses.`
 
-    return {min_communication_credits, communication_credits, communication_notes}
+    return {min_communication_credits, communication_credits, communication_notes, matched_courses}
 }

@@ -1,10 +1,10 @@
 import type { CatalogueCourse } from '../types/courseCatalogue'
 import type { CourseAttempt } from '../types/coursePlan'
 import type { StudentSetupProfile } from '../types/studentProfile'
-import type { 
-    AuditCaseSummary, 
+import type {
+    AuditCaseSummary,
     AuditResult,
-    AuditRequirementCountSummary ,
+    AuditRequirementCountSummary,
     FacultyRequirementResult,
     PromotionRequirementResult
 } from '../types/audit'
@@ -21,11 +21,11 @@ interface RunAuditProps {
 
 export function RunAudit({
     classified_courses,
-    student_course_plan, 
+    student_course_plan,
     student_profile
-} : RunAuditProps) {
+}: RunAuditProps) {
     const {
-        facultyRequirements, 
+        facultyRequirements,
         // courseRules, 
         promotionRules,
         courseRequirements
@@ -38,7 +38,7 @@ export function RunAudit({
     const faculty_requirements = (
         FacultyAuditor({
             classified_courses: classified_courses,
-            faculty_requirements: facultyRequirements, 
+            faculty_requirements: facultyRequirements,
             course_requirements: courseRequirements,
             student_course_plan: filtered_course_plan,
             student_profile: student_profile
@@ -60,8 +60,8 @@ export function RunAudit({
     );
 
     const promotion_message = getPromotionMessage(
-        promotion_target_year, 
-        student_profile, 
+        promotion_target_year,
+        student_profile,
         promotion_requirements
     );
     console.log(promotion_requirements);
@@ -113,9 +113,15 @@ export function RunAudit({
     return audit_results;
 }
 
-function filterCountedCourses(student_course_plan: CourseAttempt[]) {
-    // Filter out failed or withdrawn classes
-    return student_course_plan.filter(attempt => attempt.status == 'completed')
+function filterCountedCourses(
+    student_course_plan: CourseAttempt[]
+): CourseAttempt[] {
+    return student_course_plan.filter(
+        (attempt) =>
+            attempt.status === 'planned' ||
+            attempt.status === 'in_progress' ||
+            (attempt.status === 'completed' && attempt.grade === 'P')
+    )
 }
 
 function createAuditRequirementCountSummary(requirements: FacultyRequirementResult[]) {
@@ -125,7 +131,7 @@ function createAuditRequirementCountSummary(requirements: FacultyRequirementResu
         }
         accm[req.status] += 1;
         return accm;
-        }, {}
+    }, {}
     );
     const satisfied = grouped_by_status.satisfied ?? 0;
     const partial = grouped_by_status.partial ?? 0;
@@ -133,18 +139,18 @@ function createAuditRequirementCountSummary(requirements: FacultyRequirementResu
 
     const count_summary: AuditRequirementCountSummary = {
         satisfied: satisfied,
-        total: satisfied+partial+missing,
+        total: satisfied + partial + missing,
         partial: partial,
         missing: missing,
     }
     return count_summary;
 }
 
-function getPromotionTargetYear(academic_year : number) {
+function getPromotionTargetYear(academic_year: number) {
     if (academic_year === null || academic_year === 4) {
         return null;
     }
-    return academic_year+1
+    return academic_year + 1
 }
 
 function getPromotionMessage(
@@ -169,7 +175,7 @@ function getPromotionMessage(
         }
         accm[req.status] += 1;
         return accm;
-        }, {}
+    }, {}
     );
     console.log(grouped_by_status);
     if (grouped_by_status.missing === 0) {
