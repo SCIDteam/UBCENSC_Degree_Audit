@@ -38,16 +38,15 @@ export function PromotionAuditor({
 } : PromotionAuditorProps) {
     const promotion_requirement_results : PromotionRequirementResult[] = []
 
-    // TEMPORARY - NEED TO FIGURE OUT PURPOSE
-    const matched_courses: string[] = [];
     const requirement_area = 'Promotion';
 
     promotionRules.map((rule) => {
         if (rule.metric === "min_total_credits") {
             const {
-                promotion_minimum, 
-                total_credits, 
-                total_notes
+                promotion_minimum,
+                total_credits,
+                total_notes,
+                matched_courses
             } = AuditPromotionMinTotalCredits(
                 rule,
                 student_course_plan
@@ -71,9 +70,10 @@ export function PromotionAuditor({
         }
         else if (rule.metric === "min_science_credits") {
             const {
-                promotion_science_minimum, 
-                total_science_credits, 
-                total_science_notes
+                promotion_science_minimum,
+                total_science_credits,
+                total_science_notes,
+                matched_courses
             } = AuditPromotionMinScienceCredits(
                 rule,
                 student_course_plan
@@ -97,9 +97,10 @@ export function PromotionAuditor({
         }
         else if (rule.metric === "min_science_credits_at_level") {
             const {
-                required_science_credits_at_level, 
-                total_science_credits_at_level, 
-                total_science_at_level_notes
+                required_science_credits_at_level,
+                total_science_credits_at_level,
+                total_science_at_level_notes,
+                matched_courses
             } = AuditPromotionMinScienceCreditsAtLevel(
                 rule,
                 student_course_plan
@@ -123,9 +124,10 @@ export function PromotionAuditor({
         }
         else if (rule.metric === "min_science_credits_at_or_above_level") {
             const {
-                required_science_credits_at_or_above_level, 
-                total_science_credits_at_or_above_level, 
-                science_credits_at_or_above_level_notes
+                required_science_credits_at_or_above_level,
+                total_science_credits_at_or_above_level,
+                science_credits_at_or_above_level_notes,
+                matched_courses
             } = AuditPromotionMinScienceCreditsAtOrAboveLevel(
                 rule,
                 student_course_plan
@@ -149,9 +151,10 @@ export function PromotionAuditor({
         }
         else if (rule.metric === "min_upper_level_credits") {
             const {
-                required_upper_level_credits, 
-                total_upper_level_credits, 
-                upper_level_credits_notes
+                required_upper_level_credits,
+                total_upper_level_credits,
+                upper_level_credits_notes,
+                matched_courses
             } = AuditPromotionUpperLevelCredits(
                 rule,
                 student_course_plan
@@ -175,9 +178,10 @@ export function PromotionAuditor({
         }
         else if (rule.metric === "one_lab_course") {
             const {
-                required_lab_courses, 
-                total_lab_courses, 
-                lab_courses_notes
+                required_lab_courses,
+                total_lab_courses,
+                lab_courses_notes,
+                matched_courses
             } = AuditPromotionOneLabCourse(
                 rule,
                 student_course_plan
@@ -193,7 +197,7 @@ export function PromotionAuditor({
                     rule_type: rule.metric,
                     completed: total_lab_courses,
                     required: required_lab_courses,
-                    unit: 'credits',
+                    unit: 'course',
                     matched_courses: matched_courses,
                     notes: lab_courses_notes
                 })
@@ -201,9 +205,10 @@ export function PromotionAuditor({
         }
         else if (rule.metric === "min_communication_credits") {
             const {
-                required_min_communication_credits, 
-                total_communication_credits, 
-                communication_credits_notes
+                required_min_communication_credits,
+                total_communication_credits,
+                communication_credits_notes,
+                matched_courses
             } = AuditPromotionMinCommunicationCredits(
                 rule,
                 student_course_plan
@@ -228,6 +233,46 @@ export function PromotionAuditor({
     });
 
     return promotion_requirement_results;
+}
+
+// Mirrors facultyAuditor.ts's uniqueCourseCodes helper (duplicated rather than
+// imported to keep this file's changes scoped to Promotion; Tim's Python
+// equivalent is PromotionAuditor._course_list, which dedupes
+// effective_course_code via pandas drop_duplicates() preserving first
+// occurrence). The frontend has no effective/override course code on
+// CourseAttempt, so course_code is the best available field.
+function uniqueCourseCodes(courses: CourseAttempt[]): string[] {
+    const seen = new Set<string>();
+    const codes: string[] = [];
+
+    for (const course of courses) {
+        if (!seen.has(course.course_code)) {
+            seen.add(course.course_code);
+            codes.push(course.course_code);
+        }
+    }
+
+    return codes;
+}
+
+// Mirrors PromotionAuditor._rule_level_min: blank/unparseable -> 0.
+function ruleLevelMin(value: string): number {
+    if (value === '') return 0;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+// Mirrors PromotionAuditor._rule_level_max: blank/unparseable -> 999.
+function ruleLevelMax(value: string): number {
+    if (value === '') return 999;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? 999 : parsed;
+}
+
+// Mirrors pd.to_numeric(courses["course_number"], errors="coerce"): unparseable -> NaN,
+// which then fails any between() comparison.
+function parseCourseNumber(value: string): number {
+    return Number(value);
 }
 
 function createPromotionRequirementResult({
@@ -276,13 +321,18 @@ function AuditPromotionMinTotalCredits(
     // Resolve total promotion rules credits.
     const promotion_minimum = rule?.value ?? 0;
 
-    const total_credits = student_course_plan.reduce(
+    // All counted courses contribute to total credits.
+    const matchedCourses = student_course_plan;
+
+    const total_credits = matchedCourses.reduce(
         (accm, cur) => accm + cur.credits, 0
     );
 
+    const matched_courses = uniqueCourseCodes(matchedCourses);
+
     const total_notes = ``
 
-    return {promotion_minimum, total_credits, total_notes}
+    return {promotion_minimum, total_credits, total_notes, matched_courses}
 }
 
 function AuditPromotionMinScienceCredits(
@@ -292,13 +342,17 @@ function AuditPromotionMinScienceCredits(
     // Resolve total science promotion rules credits.
     const promotion_science_minimum = rule?.value ?? 0;
 
-    const total_science_credits = student_course_plan
+    const matchedCourses = student_course_plan
         .filter((course) => course.is_science_credit)
+
+    const total_science_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0);
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const total_science_notes = rule.notes;
 
-    return {promotion_science_minimum, total_science_credits, total_science_notes}
+    return {promotion_science_minimum, total_science_credits, total_science_notes, matched_courses}
 }
 
 function AuditPromotionMinScienceCreditsAtLevel(
@@ -308,20 +362,27 @@ function AuditPromotionMinScienceCreditsAtLevel(
     // Resolve total science promotion rules credits at level.
     const required_science_credits_at_level = rule?.value ?? 0;
 
-    const level_min = rule?.course_level_min ?? 0;
-    const level_max = rule?.course_level_max ?? 0;
+    const level_min = ruleLevelMin(rule?.course_level_min ?? '');
+    const level_max = ruleLevelMax(rule?.course_level_max ?? '');
 
-    const total_science_credits_at_level = student_course_plan
+    const matchedCourses = student_course_plan
         .filter((course) => {
-            course.is_science_credit && 
-            course.course_number >= level_min &&
-            course.course_number <= level_max
+            const course_number = parseCourseNumber(course.course_number);
+            return (
+                course.is_science_credit &&
+                course_number >= level_min &&
+                course_number <= level_max
+            )
         })
+
+    const total_science_credits_at_level = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0);
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const total_science_at_level_notes = rule.notes;
 
-    return {required_science_credits_at_level, total_science_credits_at_level, total_science_at_level_notes}
+    return {required_science_credits_at_level, total_science_credits_at_level, total_science_at_level_notes, matched_courses}
 }
 
 function AuditPromotionMinScienceCreditsAtOrAboveLevel(
@@ -331,24 +392,34 @@ function AuditPromotionMinScienceCreditsAtOrAboveLevel(
     // Resolve total science promotion rules credits at level.
     const required_science_credits_at_or_above_level = rule?.value ?? 0;
 
-    const level_min = rule?.course_level_min ?? 0;
-    const level_max = rule?.course_level_max ?? 0;
+    const level_min = ruleLevelMin(rule?.course_level_min ?? '');
+    const level_max = ruleLevelMax(rule?.course_level_max ?? '');
 
-    // TODO: Verify logic
-    const total_science_credits_at_or_above_level = student_course_plan
+    // Tim's Python implements this identically to at_level (same between()
+    // filter); "at or above" rules rely on course_level_max being left blank
+    // in the rule data, which defaults level_max to 999.
+    const matchedCourses = student_course_plan
         .filter((course) => {
-            course.is_science_credit && 
-            course.course_number >= level_min &&
-            course.course_number <= level_max
+            const course_number = parseCourseNumber(course.course_number);
+            return (
+                course.is_science_credit &&
+                course_number >= level_min &&
+                course_number <= level_max
+            )
         })
+
+    const total_science_credits_at_or_above_level = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0);
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const science_credits_at_or_above_level_notes = rule.notes;
 
     return {
-        required_science_credits_at_or_above_level, 
-        total_science_credits_at_or_above_level, 
-        science_credits_at_or_above_level_notes
+        required_science_credits_at_or_above_level,
+        total_science_credits_at_or_above_level,
+        science_credits_at_or_above_level_notes,
+        matched_courses
     }
 }
 
@@ -359,22 +430,30 @@ function AuditPromotionUpperLevelCredits(
     // Resolve total science promotion rules credits at level.
     const required_upper_level_credits = rule?.value ?? 0;
 
-    const level_min = rule?.course_level_min ?? 0;
-    const level_max = rule?.course_level_max ?? 0;
+    const level_min = ruleLevelMin(rule?.course_level_min ?? '');
+    const level_max = ruleLevelMax(rule?.course_level_max ?? '');
 
-    const total_upper_level_credits = student_course_plan
+    const matchedCourses = student_course_plan
         .filter((course) => {
-            course.course_number >= level_min &&
-            course.course_number <= level_max
+            const course_number = parseCourseNumber(course.course_number);
+            return (
+                course_number >= level_min &&
+                course_number <= level_max
+            )
         })
+
+    const total_upper_level_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0);
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const upper_level_credits_notes = rule.notes;
 
     return {
-        required_upper_level_credits, 
-        total_upper_level_credits, 
-        upper_level_credits_notes
+        required_upper_level_credits,
+        total_upper_level_credits,
+        upper_level_credits_notes,
+        matched_courses
     }
 }
 
@@ -382,19 +461,24 @@ function AuditPromotionOneLabCourse(
     rule: PromotionRules,
     student_course_plan: CourseAttempt[]
 ) {
-    // Resolve total science promotion rules credits at level.
+    // Counts distinct eligible lab courses (Tim dedupes effective_course_code
+    // before counting, not raw attempts).
     const required_lab_courses = rule?.value ?? 0;
 
-    const total_lab_courses = student_course_plan
+    const matchedCourses = student_course_plan
         .filter((course) => course.is_lab_course)
-        .length
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
+
+    const total_lab_courses = matched_courses.length
 
     const lab_courses_notes = rule.notes;
 
     return {
-        required_lab_courses, 
-        total_lab_courses, 
-        lab_courses_notes
+        required_lab_courses,
+        total_lab_courses,
+        lab_courses_notes,
+        matched_courses
     }
 }
 
@@ -405,15 +489,20 @@ function AuditPromotionMinCommunicationCredits(
     // Resolve total science promotion rules credits at level.
     const required_min_communication_credits = rule?.value ?? 0;
 
-    const total_communication_credits = student_course_plan
+    const matchedCourses = student_course_plan
         .filter((course) => course.is_communication_course)
+
+    const total_communication_credits = matchedCourses
         .reduce((accm, cur) => accm + cur.credits, 0);
+
+    const matched_courses = uniqueCourseCodes(matchedCourses);
 
     const communication_credits_notes = rule.notes;
 
     return {
-        required_min_communication_credits, 
-        total_communication_credits, 
-        communication_credits_notes
+        required_min_communication_credits,
+        total_communication_credits,
+        communication_credits_notes,
+        matched_courses
     }
 }
