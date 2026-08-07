@@ -31,13 +31,16 @@ export function RunAudit({
         courseRequirements
     } = LoadRules();
 
+    // Filter for counted courses
+    const filtered_course_plan = filterCountedCourses(student_course_plan);
+
     // Faculty Audit
     const faculty_requirements = (
         FacultyAuditor({
             classified_courses: classified_courses,
             faculty_requirements: facultyRequirements, 
             course_requirements: courseRequirements,
-            student_course_plan: student_course_plan,
+            student_course_plan: filtered_course_plan,
             student_profile: student_profile
         })
     );
@@ -51,7 +54,7 @@ export function RunAudit({
             promotion_target_year: promotion_target_year,
             classified_courses: classified_courses,
             promotionRules: promotionRules,
-            student_course_plan: student_course_plan,
+            student_course_plan: filtered_course_plan,
             student_profile: student_profile
         })
     );
@@ -66,7 +69,7 @@ export function RunAudit({
 
     // Create case summary
     const case_id = crypto.randomUUID();
-    const counted_credits = student_course_plan
+    const counted_credits = filtered_course_plan
         .reduce((accm, cur) => accm + cur.credits, 0)
     const dummy_req_count_summary: AuditRequirementCountSummary = {
         satisfied: 0,
@@ -108,6 +111,11 @@ export function RunAudit({
     };
 
     return audit_results;
+}
+
+function filterCountedCourses(student_course_plan: CourseAttempt[]) {
+    // Filter out failed or withdrawn classes
+    return student_course_plan.filter(attempt => attempt.status == 'completed')
 }
 
 function createAuditRequirementCountSummary(requirements: FacultyRequirementResult[]) {
