@@ -1,5 +1,3 @@
-import type { ProgramType } from "../utils/setupOptions"
-
 export type Unit = 'credits' | 'categories' | 'course'
 export type Metric = (
     'required_course' | 
