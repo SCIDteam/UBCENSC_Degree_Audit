@@ -152,7 +152,7 @@
 //             req => (
 //                 (req.program === student_profile.program || req.program === 'ALL' || req.program === '') &&
 //                 // Not considering MajorOrHonours etc.
-//                 (req.program_context === student_profile.program_type || req.program_context === 'ALL' || req.program_context === '') &&
+//                 (req.applicable_program === student_profile.program_type || req.applicable_program === 'ALL' || req.applicable_program === '') &&
 //                 (req.calendar_year === student_profile.calendar_year || req.calendar_year === 'ALL' || req.calendar_year === '') &&
 
 //                 req.calendar_year === student_profile.calendar_year &&
