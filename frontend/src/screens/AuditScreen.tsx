@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { BookOpen } from 'lucide-react'
-import { academicYears, concentrations, programs } from '../data/setupOptions'
+import { academicYears, concentrations, programs } from '../utils/setupOptions'
 import type { StudentSetupProfile } from '../types/studentProfile'
 import type { AuditInput, AuditResult } from '../types/audit'
 import FacultyRequirements from '../components/audit/FacultyRequirements'

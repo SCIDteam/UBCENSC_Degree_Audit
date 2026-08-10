@@ -4,7 +4,7 @@ import type {
   OptionId,
   ProgramCode,
   ProgramType,
-} from '../data/setupOptions'
+} from '../utils/setupOptions'
 
 // Mirrors the fields of student_profile.csv that are collected by the
 // Student Setup screen. Field names and value formats match that contract

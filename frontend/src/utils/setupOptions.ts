@@ -10,7 +10,9 @@ export const programs = [
   },
 ] as const;
 
+// Make all upper
 export const programTypes = [
+  // "All",
   "Major",
   "Honours",
 ] as const;

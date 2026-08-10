@@ -4,7 +4,7 @@ import type {
     PromotionRules,
     CourseRequirements
 } from '../types/auditRules'
-import auditRules from '../../public/data/rules.json'
+import auditRules from '../data/rules.json'
 
 export function LoadRules() {
     const facultyRequirements = auditRules.facultyRequirements as FacultyRequirements[];

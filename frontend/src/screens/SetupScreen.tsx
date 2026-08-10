@@ -14,7 +14,7 @@ import {
   concentrationsByCalendarYear,
   programTypes,
   programs,
-} from '../data/setupOptions'
+} from '../utils/setupOptions'
 import { emptyStudentSetupProfile, type StudentSetupProfile } from '../types/studentProfile'
 
 interface Option {

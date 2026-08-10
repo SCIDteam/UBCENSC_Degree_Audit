@@ -5,12 +5,12 @@ import AuditScreen from './screens/AuditScreen'
 import type { StudentSetupProfile } from './types/studentProfile'
 import type { CourseAttempt } from './types/coursePlan'
 import type { AuditInput, AuditResult } from './types/audit'
-import { buildRecommendedAttempts } from './data/recommendedPlan'
-import { buildAuditInput } from './data/auditInputAdapter'
+import { buildRecommendedAttempts } from './utils/recommendedPlan'
+import { buildAuditInput } from './utils/auditInputAdapter'
 import { RunAudit as runAuditEngine } from './audit/runAudit'
 // Temporary fixture standing in for the real browser audit calculator,
 // which will replace this once AuditInput -> AuditResult is implemented.
-import { exampleAuditResult } from './data/exampleAuditResult'
+import { exampleAuditResult } from './utils/exampleAuditResult'
 
 const USE_DEVELOPMENT_AUDIT_ENGINE = true
 type AppScreen = 'setup' | 'planner' | 'audit'

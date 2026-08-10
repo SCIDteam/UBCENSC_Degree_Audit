@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BookOpen, ChevronDown, ChevronRight, Plus, X } from 'lucide-react'
-import { academicYears, concentrations, programs } from '../data/setupOptions'
+import { academicYears, concentrations, programs } from '../utils/setupOptions'
 import type { StudentSetupProfile } from '../types/studentProfile'
 import type { CourseAddedToast, CourseAttempt, PlannerTerm, PlannerYear } from '../types/coursePlan'
 import type { CatalogueCourse } from '../types/courseCatalogue'

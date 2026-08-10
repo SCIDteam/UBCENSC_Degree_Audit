@@ -4,7 +4,7 @@ import type {
   OptionId,
   ProgramCode,
   ProgramType,
-} from '../data/setupOptions'
+} from '../utils/setupOptions'
 import type {
   PlannerTerm,
   PlannerYear,

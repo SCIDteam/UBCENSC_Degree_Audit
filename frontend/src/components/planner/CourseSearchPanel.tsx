@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { AlertCircle, Search, ChevronDown, ChevronUp } from 'lucide-react'
 import type { CatalogueCourse } from '../../types/courseCatalogue'
-import { loadCourseCatalogue } from '../../data/courseCatalogueLoader'
+import { loadCourseCatalogue } from '../../utils/courseCatalogueLoader'
 
 export type CourseSearchPanelHandle = {
   focusInput: () => void
