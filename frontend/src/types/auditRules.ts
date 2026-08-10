@@ -1,3 +1,5 @@
+import type { ProgramType } from "../utils/setupOptions"
+
 export type Unit = 'credits' | 'categories' | 'course'
 export type Metric = (
     'required_course' | 
@@ -18,7 +20,7 @@ export type Metric = (
     'one_course_from_list' |
     'one_lab_course' 
 )
-export type ProgramContext = 'All' | 'MajorOrHonours' | 'Major' | 'Honours'
+// export type ProgramContext = 'All' | 'MajorOrHonours' | 'Major' | 'Honours'
 
 export type BaseRule = {
     metric: Metric
@@ -29,14 +31,13 @@ export type BaseRule = {
 
 export interface FacultyRequirements extends BaseRule {
     id: string
-    program_context: ProgramContext
+    program_type: ProgramType
 }
 
 export interface CourseRules extends BaseRule {
     id: string
-    program_context: ProgramContext
+    program_type: ProgramType
     calendar_year: string
-    program_type: string
     course_code: string
 }
 
@@ -51,6 +52,6 @@ export interface PromotionRules extends BaseRule {
 export interface CourseRequirements extends BaseRule {
     id: string
     program: string
-    program_context: ProgramContext
+    program_type: ProgramType
     calendar_year: string
 }
