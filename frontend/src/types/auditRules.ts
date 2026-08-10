@@ -20,7 +20,7 @@ export type Metric = (
     'one_course_from_list' |
     'one_lab_course' 
 )
-// export type ProgramContext = 'All' | 'MajorOrHonours' | 'Major' | 'Honours'
+export type ApplicableProgram = "All" | "Major" | "Honours"
 
 export type BaseRule = {
     metric: Metric
@@ -31,12 +31,12 @@ export type BaseRule = {
 
 export interface FacultyRequirements extends BaseRule {
     id: string
-    program_type: ProgramType
+    applicable_program: ApplicableProgram
 }
 
 export interface CourseRules extends BaseRule {
     id: string
-    program_type: ProgramType
+    applicable_program: ApplicableProgram
     calendar_year: string
     course_code: string
 }
@@ -52,6 +52,6 @@ export interface PromotionRules extends BaseRule {
 export interface CourseRequirements extends BaseRule {
     id: string
     program: string
-    program_type: ProgramType
+    applicable_program: ApplicableProgram
     calendar_year: string
 }

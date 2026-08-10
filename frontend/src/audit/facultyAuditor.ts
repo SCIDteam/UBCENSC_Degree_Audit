@@ -304,7 +304,11 @@ function AuditTotalCredits(
             req.metric === 'min_total_credits' &&
             req.program === student_profile.program &&
             req.calendar_year === student_profile.calendar_year &&
-            req.program_type === student_profile.program_type
+            (
+                req.applicable_program === student_profile.program_type ||
+                req.applicable_program === 'All'
+            )
+
     );
 
     const required_credits = Math.max(

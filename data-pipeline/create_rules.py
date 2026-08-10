@@ -28,7 +28,7 @@ def create_faculty_requirement_rules(faculty_requirement_rules: pd.DataFrame):
             columns = {
                 "requirement_id": "id",
                 "rule_type": "metric",
-                "program_context": "program_type"
+                "program_context": "applicable_program"
             }
         )
         .drop(columns=["requirement_area"])
@@ -44,6 +44,7 @@ def create_course_rules(courseRules: pd.DataFrame):
             columns = {
                 "requirement_id": "id",
                 "rule_type": "metric",
+                "program_type": "applicable_program",
                 "program": "program_context",
                 "credits": "value"
             }
@@ -108,7 +109,8 @@ def create_course_requirements(course_requirements: pd.DataFrame):
                 "group_id": "id",
                 "rule_type": "metric",
                 "rule_value": "value",
-                "source_text": "notes"
+                "source_text": "notes",
+                "program_type": "applicable_program"
             }
         )
         .drop(
