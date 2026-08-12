@@ -1,4 +1,6 @@
 import type {
+    AllocationConfigs,
+    AllocationConfigRule,
     SpecializationRequirementCourse,
     SpecializationRequirementGroup,
 } from '../types/auditRules'
@@ -130,6 +132,44 @@ export class SpecializationRequirementResolver {
         }
 
         return true
+    }
+
+    getAllocationConfigForCalendar(
+        allocationConfigs: AllocationConfigs,
+    ): AllocationConfigRule[] {
+        return allocationConfigs[this.studentProfile.calendar_year] ?? []
+    }
+
+    getBucketForRequirement(
+        requirement: SpecializationRequirementGroup,
+        allocationConfig: AllocationConfigRule[],
+    ): string | null {
+        for (const config of allocationConfig) {
+            const requirementAreas = this.splitSemicolon(
+                config.requirement_areas,
+            )
+
+            const canonicalRuleTypes = this.splitSemicolon(
+                config.canonical_rule_types,
+            )
+
+            if (
+                requirementAreas.includes(requirement.requirement_area) ||
+                canonicalRuleTypes.includes(requirement.rule_type)
+            ) {
+                return config.bucket
+            }
+        }
+
+        return null
+    }
+
+    getGroupsByRequirementArea(
+        requirementArea: string,
+    ): SpecializationRequirementGroup[] {
+        return this.getApplicableRequirementGroups().filter(
+            (group) => group.requirement_area === requirementArea,
+        )
     }
 
     getApplicableRequirementGroups(): SpecializationRequirementGroup[] {
