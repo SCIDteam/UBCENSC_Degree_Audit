@@ -25,6 +25,113 @@ export class SpecializationRequirementResolver {
         this.studentProfile = studentProfile
     }
 
+    private splitSemicolon(value: string | null): string[] {
+        if (!value) {
+            return []
+        }
+
+        return value
+            .split(';')
+            .map((part) => part.trim())
+            .filter(Boolean)
+    }
+
+    private getLevelBounds(
+        includePattern: string | null,
+    ): { min: number | null; max: number | null } {
+        if (!includePattern) {
+            return {
+                min: null,
+                max: null,
+            }
+        }
+
+        const match = includePattern
+            .trim()
+            .toLowerCase()
+            .match(/^(\d)00-level$/)
+
+        if (!match) {
+            return {
+                min: null,
+                max: null,
+            }
+        }
+
+        const min = Number(match[1]) * 100
+
+        return {
+            min,
+            max: min + 99,
+        }
+    }
+
+    courseMatchesLevelRequirement(
+        courseSubject: string,
+        courseNumber: string,
+        requirement: SpecializationRequirementGroup,
+    ): boolean {
+        const allowedSubjects = this.splitSemicolon(
+            requirement.rule_subject,
+        )
+
+        const excludedCourseCodes = this.splitSemicolon(
+            requirement.exclude_pattern,
+        )
+
+        const { min, max } = this.getLevelBounds(
+            requirement.include_pattern,
+        )
+
+        if (min === null || max === null) {
+            return false
+        }
+
+        const normalizedSubject = courseSubject.trim().toUpperCase()
+        const normalizedNumber = courseNumber.trim()
+
+        const courseCode =
+            `${normalizedSubject}${normalizedNumber}`
+
+        const normalizedSubjects = new Set(
+            allowedSubjects.map(
+                (subject) => subject.trim().toUpperCase(),
+            ),
+        )
+
+        if (!normalizedSubjects.has(normalizedSubject)) {
+            return false
+        }
+
+        if (
+            excludedCourseCodes.some(
+                (excludedCode) =>
+                    excludedCode
+                        .replaceAll('_V', '')
+                        .replaceAll(' ', '')
+                        .toUpperCase() === courseCode,
+            )
+        ) {
+            return false
+        }
+
+        const numericCourseNumber =
+            Number.parseInt(normalizedNumber, 10)
+
+        if (Number.isNaN(numericCourseNumber)) {
+            return false
+        }
+
+        if (
+            numericCourseNumber < min ||
+            numericCourseNumber > max
+        ) {
+            return false
+        }
+
+        return true
+    }
+
     getApplicableRequirementGroups(): SpecializationRequirementGroup[] {
         return this.requirementGroups.filter((group) => {
             const matchesProgram =
