@@ -18,8 +18,26 @@ def read_data(dir_path):
     return requirements_df
 
 def write_json_to(result, output_path):
+    output_path = Path(output_path)
+
+    output_path.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
     with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(result, file, indent=4)
+        json.dump(result, file, indent=4)        
+def create_structured_records(df: pd.DataFrame):
+    """
+    Preserve the full CSV structure for frontend specialization
+    and allocation logic while converting Pandas values into
+    JSON-compatible Python values.
+    """
+    return json.loads(
+        df.to_json(
+            orient="records"
+        )
+    )
 
 def create_faculty_requirement_rules(faculty_requirement_rules: pd.DataFrame):
     return (
@@ -141,20 +159,66 @@ if __name__ == "__main__":
     faculty_requirements_dir = "./faculty_requirements"
     requirements = read_data(faculty_requirements_dir)
 
-    rules['facultyRequirements'] = create_faculty_requirement_rules(requirements['faculty_requirement_rules'])
-    rules['courseRules'] = create_course_rules(requirements['faculty_requirement_courses'])
-    rules['promotionRules'] = create_promotion_rules(requirements['promotion_rules'])
+    rules["facultyRequirements"] = create_faculty_requirement_rules(
+        requirements["faculty_requirement_rules"]
+    )
+    rules["courseRules"] = create_course_rules(
+        requirements["faculty_requirement_courses"]
+    )
+    rules["promotionRules"] = create_promotion_rules(
+        requirements["promotion_rules"]
+    )
 
-    # Course Requirements
+    # Course / Specialization Requirements
     course_requirements_dir = "./course_requirements"
-    rules[f"courseRequirements"] = []
-    for program_year in ['ensc_2024_2025', 'ensc_2026_2027']:
-        dir_name = os.path.join(course_requirements_dir, program_year)
-        requirements = read_data(dir_name)    
-        rules[f"courseRequirements"].extend(
-            create_course_requirements(
-                requirements['requirement_groups']
+
+    rules["courseRequirements"] = []
+rules["specializationRequirementGroups"] = []
+rules["specializationRequirementCourses"] = []
+rules["allocationConfigs"] = {}
+
+for program_year in [
+    "ensc_2024_2025",
+    "ensc_2026_2027",
+]:
+    dir_name = os.path.join(
+        course_requirements_dir,
+        program_year,
+    )
+
+    requirements = read_data(dir_name)
+
+    rules["courseRequirements"].extend(
+        create_course_requirements(
+            requirements["requirement_groups"]
+        )
+    )
+
+    rules["specializationRequirementGroups"].extend(
+        create_structured_records(
+            requirements["requirement_groups"]
+        )
+    )
+
+    rules["specializationRequirementCourses"].extend(
+        create_structured_records(
+            requirements["requirement_courses"]
+        )
+    )
+
+    if "allocation_config" in requirements:
+        calendar_year = program_year.replace(
+            "ensc_",
+            ""
+        ).replace(
+            "_",
+            "-"
+        )
+
+        rules["allocationConfigs"][calendar_year] = (
+            create_structured_records(
+                requirements["allocation_config"]
             )
         )
-    
-    write_json_to(rules, output_path)
+
+write_json_to(rules, output_path)
