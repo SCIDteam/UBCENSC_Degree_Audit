@@ -838,3 +838,89 @@ export function allocateComplementaryRequirement(
 
     return rows
 }
+
+// ---------------------------------------------------------------------------
+// Residual Electives allocation (Slice 7)
+// ---------------------------------------------------------------------------
+//
+// Mirrors Tim's _allocate_residual_electives(bucket, priority=50), called from
+// allocate()'s bucket loop via `elif bucket == self.config.residual_bucket:`.
+// self.config.residual_bucket defaults to the literal string "electives"
+// (models.AllocationConfig.residual_bucket) and is only ever overridden by an
+// optional `residual_bucket` column in allocation_config.csv — neither the
+// 2024-2025 nor 2026-2027 CSV defines that column, so both calendars use the
+// default. AllocationConfigRule (types/auditRules.ts) has no residual_bucket
+// field at all, so there is nothing to read dynamically here; 'electives' is
+// hardcoded, matching every other allocate*Requirement function's bucket
+// literal (e.g. allocateCoreRequirements checks `pass.config.bucket !== 'core'`).
+//
+// Unlike every earlier bucket, Tim's residual-elective method takes NO
+// specialization_audit / requirement rows at all — it is not called with one,
+// and does no per-requirement lookup. It walks the full allocation DataFrame
+// directly:
+//
+//   for idx, row in df.iterrows():
+//       if not self._is_counted_row(row): continue
+//       if self._is_allocated(row): continue
+//       df = self._assign_course(..., group_id="", label=self.config.residual_label,
+//                                 rule_type="residual_elective", bucket=bucket,
+//                                 priority=priority, method="residual_elective",
+//                                 notes="Allocated as residual elective after priority requirements.")
+//
+// This confirms every TASK from the brief:
+// - TASK B: the candidate set is exactly getUnallocatedCountedRows(rows) — no
+//   course-code eligibility matching of any kind (no matched_courses lookup,
+//   no resolver call). Every counted, still-unallocated row becomes elective.
+//   This is a true fallback bucket.
+// - TASK C: no requirement row (canonical or otherwise) is used. group_id is
+//   the empty string, label is the config's fixed residual_label string (NOT
+//   pulled from any row), rule_type is the fixed string "residual_elective".
+//   requirement_area is display_name_for_bucket(bucket) — pass.config.display_name
+//   here, exactly like every other bucket's requirement_area.
+// - TASK D: priority=50 is confirmed by the call site
+//   (`_allocate_residual_electives(..., priority=50)` in allocate()).
+//   allocation_method is the literal string "residual_elective" — NOT
+//   "priority_elective" as the task brief's own guess suggested; Tim's other
+//   buckets use a "priority_*" method naming convention, but this one does not.
+//   allocation_notes is always the fixed non-empty string below (unlike every
+//   earlier bucket's assignment calls, which all pass notes="").
+// - TASK E: Tim applies no selection/sort ordering before assigning — every
+//   qualifying row is assigned in DataFrame iteration order (original row
+//   order). getUnallocatedCountedRows filters via Array.filter, which
+//   preserves source order, so no extra sort is needed or applied here.
+// - TASK F: there is no credit or count cap, and no "remaining credits"
+//   subtraction against any canonical row — every unallocated counted row is
+//   assigned, unconditionally.
+//
+// Mutates the AllocationWorkingRow objects referenced by `rows` in place and
+// returns the same array reference, preserving row identity, count, and
+// order; non-counted and already-allocated rows are untouched.
+const RESIDUAL_ELECTIVE_ALLOCATION_PRIORITY = 50
+const RESIDUAL_ELECTIVE_ALLOCATION_METHOD = 'residual_elective'
+const RESIDUAL_ELECTIVE_RULE_TYPE = 'residual_elective'
+const RESIDUAL_ELECTIVE_LABEL = 'Residual elective / unallocated counted course'
+const RESIDUAL_ELECTIVE_NOTES = 'Allocated as residual elective after priority requirements.'
+
+export function allocateResidualElectives(
+    rows: AllocationWorkingRow[],
+    pass: AllocationPass
+): AllocationWorkingRow[] {
+    if (pass.config.bucket !== 'electives') {
+        return rows
+    }
+
+    const unallocatedRows = getUnallocatedCountedRows(rows)
+
+    for (const row of unallocatedRows) {
+        row.exclusive_requirement_area = pass.config.display_name
+        row.exclusive_group_id = ''
+        row.exclusive_label = RESIDUAL_ELECTIVE_LABEL
+        row.exclusive_rule_type = RESIDUAL_ELECTIVE_RULE_TYPE
+        row.exclusive_bucket = pass.config.bucket
+        row.allocation_priority = RESIDUAL_ELECTIVE_ALLOCATION_PRIORITY
+        row.allocation_method = RESIDUAL_ELECTIVE_ALLOCATION_METHOD
+        row.allocation_notes = RESIDUAL_ELECTIVE_NOTES
+    }
+
+    return rows
+}
