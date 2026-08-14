@@ -541,3 +541,211 @@ export function allocateCoreRequirements(
 
     return rows
 }
+
+// ---------------------------------------------------------------------------
+// Canonical Tools allocation (Slice 4)
+// ---------------------------------------------------------------------------
+
+const TOOLS_ALLOCATION_PRIORITY = 20
+const TOOLS_ALLOCATION_METHOD = 'priority_tools'
+
+// Allocates the canonical Tools Elective requirement only. No-ops (returns
+// rows unchanged) unless pass.config.bucket === 'tools'.
+//
+// Mirrors Tim's _allocate_canonical_course_bucket(bucket="tools", priority=20,
+// method="priority_tools"):
+// 1. Find the canonical Tools row: pass.requirements filtered to rule_type in
+//    config.canonical_rule_types (not hardcoded to 'tools_elective_total'),
+//    matching Tim's canonical_rows_for_bucket. SpecializationAuditor already
+//    guarantees at most one tools_elective_total row per audit, but this
+//    still takes only the first match (rows.find) to mirror Tim's
+//    `rows.iloc[0]` first-row behavior in case more than one ever exists.
+// 2. required_count = Math.trunc(canonical row's required), matching Tim's
+//    `int(float(audit_row.get("required", 0)))`. No canonical row, or
+//    required_count <= 0, is a no-op (Tim's `if rows.empty` / `if
+//    required_count <= 0: return df`).
+// 3. Eligibility reuses the canonical row's own matched_courses via
+//    getEligibleUnallocatedRowsForRequirement — see that function's docstring
+//    for why this differs from Tim's get_eligible_courses_by_bucket without
+//    being a behavioral gap: AllocationEngine does not reimplement Tools rule
+//    parsing here.
+// 4. Selection uses selectRowsByCount directly (not selectRowsForRequirement)
+//    because the canonical Tools row is always unit === 'course' by
+//    construction (auditCanonicalToolsRequirement always sets unit: 'course'),
+//    matching Tim's canonical course bucket, which is always count-based.
+// 5. applyExclusiveAssignment supplies group_id/label/rule_type from the
+//    canonical row itself and requirement_area/bucket from pass.config,
+//    exactly like every other bucket's assignment call — allocation_notes is
+//    always "" here, matching Tim's `notes=""` for this bucket.
+//
+// Mutates the AllocationWorkingRow objects referenced by `rows` in place and
+// returns the same array reference, preserving row identity, count, and
+// order; non-counted and non-Tools rows are untouched.
+export function allocateToolsRequirement(
+    rows: AllocationWorkingRow[],
+    pass: AllocationPass
+): AllocationWorkingRow[] {
+    if (pass.config.bucket !== 'tools') {
+        return rows
+    }
+
+    const canonicalRuleTypes = splitSemicolonList(pass.config.canonical_rule_types)
+
+    const canonicalRow = pass.requirements.find((requirement) =>
+        canonicalRuleTypes.includes(requirement.rule_type)
+    )
+
+    if (!canonicalRow) {
+        return rows
+    }
+
+    const requiredCount = Math.trunc(canonicalRow.required)
+
+    if (requiredCount <= 0) {
+        return rows
+    }
+
+    const eligibleRows = getEligibleUnallocatedRowsForRequirement(rows, canonicalRow)
+
+    const selectedRows = selectRowsByCount(eligibleRows, requiredCount)
+
+    applyExclusiveAssignment(
+        selectedRows,
+        canonicalRow,
+        pass.config,
+        TOOLS_ALLOCATION_PRIORITY,
+        TOOLS_ALLOCATION_METHOD
+    )
+
+    return rows
+}
+
+// ---------------------------------------------------------------------------
+// Option / Area of Concentration allocation (Slice 5)
+// ---------------------------------------------------------------------------
+
+const OPTION_SPECIFIC_ALLOCATION_PRIORITY = 30
+const OPTION_SPECIFIC_ALLOCATION_METHOD_PREFIX = 'priority_option_specific'
+const OPTION_TOTAL_ALLOCATION_PRIORITY = 35
+const OPTION_TOTAL_ALLOCATION_METHOD = 'priority_option_total'
+
+// Sums attempt.credits for every row currently exclusively assigned to
+// `bucket`. Matches Tim's `df[df["exclusive_bucket"] == bucket]["credits"].sum()`,
+// evaluated fresh (after the specific-requirement loop has run) so it
+// reflects whatever that loop already claimed.
+function sumAllocatedCreditsForBucket(rows: AllocationWorkingRow[], bucket: string): number {
+    return rows
+        .filter((row) => row.exclusive_bucket === bucket)
+        .reduce((total, row) => total + row.attempt.credits, 0)
+}
+
+// Allocates the Option / Area of Concentration bucket only. No-ops (returns
+// rows unchanged) unless pass.config.bucket === 'option'.
+//
+// Mirrors Tim's _allocate_option_requirement(priority_specific=30,
+// priority_total=35), in two stages:
+//
+// STAGE 1 — specific option requirements (Tim's specific_rows loop):
+// pass.requirements, excluding rows whose rule_type is one of this bucket's
+// canonical_rule_types (the canonical AoC total row(s)) OR is literally
+// "theme_minimum". theme_minimum is excluded explicitly here — Tim never
+// gives it its own exclusive assignment in this method (his post-allocation
+// _allocated_theme_minimum_row just preserves the original pre-allocation
+// audit row and defers recalculation), so this frontend does the same: a
+// theme_minimum row is left alone, not routed through selectRowsForRequirement.
+// Remaining specific rows are processed in source order via the same
+// eligible -> select -> assign shape as allocateCoreRequirements, using
+// priority=30 and method f"priority_option_specific_{rule_type}" (Tim's
+// method_prefix="priority_option_specific" + rule_type from
+// _allocate_group_requirement). A course claimed by an earlier specific
+// requirement is unavailable to a later one in the same pass.
+//
+// STAGE 2 — canonical option total (Tim's canonical_rows_for_bucket lookup):
+// Find the canonical row via pass.config.canonical_rule_types (not
+// hardcoded to 'option_total_credits'). required_credits = canonical row's
+// required. already_allocated_credits = sum of attempt.credits over EVERY
+// row currently exclusive_bucket === 'option' — this includes whatever
+// Stage 1 just assigned, so Tim's remaining_credits =
+// max(required_credits - already_allocated_credits, 0) is a TOP-UP, not the
+// full canonical target: e.g. required=15, 6 already allocated to specific
+// AoC requirements -> only 9 more are selected here, not 15. If
+// remaining_credits <= 0, no-op. Eligibility reuses the canonical row's own
+// matched_courses via getEligibleUnallocatedRowsForRequirement (substituting
+// for Tim's resolver.get_option_eligible_course_codes, matching the same
+// deliberate simplification already used for the Tools bucket). Selection
+// uses selectRowsByCredits directly (Tim's
+// _select_unallocated_eligible_indices_by_credits), since the canonical
+// option row is always unit === 'credits' by construction. Assignment uses
+// priority=35 and method "priority_option_total" (fixed string, NOT
+// rule_type-suffixed — unlike Stage 1's method).
+//
+// Mutates the AllocationWorkingRow objects referenced by `rows` in place and
+// returns the same array reference, preserving row identity, count, and
+// order; non-counted and non-option rows are untouched.
+export function allocateOptionRequirements(
+    rows: AllocationWorkingRow[],
+    pass: AllocationPass
+): AllocationWorkingRow[] {
+    if (pass.config.bucket !== 'option') {
+        return rows
+    }
+
+    const canonicalRuleTypes = splitSemicolonList(pass.config.canonical_rule_types)
+
+    const specificRequirements = pass.requirements.filter(
+        (requirement) =>
+            !canonicalRuleTypes.includes(requirement.rule_type) &&
+            requirement.rule_type !== 'theme_minimum'
+    )
+
+    for (const requirement of specificRequirements) {
+        if (requirement.required <= 0) {
+            continue
+        }
+
+        const eligibleRows = getEligibleUnallocatedRowsForRequirement(rows, requirement)
+
+        if (eligibleRows.length === 0) {
+            continue
+        }
+
+        const selectedRows = selectRowsForRequirement(eligibleRows, requirement)
+
+        applyExclusiveAssignment(
+            selectedRows,
+            requirement,
+            pass.config,
+            OPTION_SPECIFIC_ALLOCATION_PRIORITY,
+            `${OPTION_SPECIFIC_ALLOCATION_METHOD_PREFIX}_${requirement.rule_type}`
+        )
+    }
+
+    const canonicalRow = pass.requirements.find((requirement) =>
+        canonicalRuleTypes.includes(requirement.rule_type)
+    )
+
+    if (!canonicalRow) {
+        return rows
+    }
+
+    const requiredCredits = canonicalRow.required
+    const alreadyAllocatedCredits = sumAllocatedCreditsForBucket(rows, pass.config.bucket)
+    const remainingCredits = Math.max(requiredCredits - alreadyAllocatedCredits, 0)
+
+    if (remainingCredits <= 0) {
+        return rows
+    }
+
+    const eligibleRows = getEligibleUnallocatedRowsForRequirement(rows, canonicalRow)
+    const selectedRows = selectRowsByCredits(eligibleRows, remainingCredits)
+
+    applyExclusiveAssignment(
+        selectedRows,
+        canonicalRow,
+        pass.config,
+        OPTION_TOTAL_ALLOCATION_PRIORITY,
+        OPTION_TOTAL_ALLOCATION_METHOD
+    )
+
+    return rows
+}
