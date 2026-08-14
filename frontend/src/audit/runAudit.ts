@@ -5,13 +5,17 @@ import type {
     AuditCaseSummary,
     AuditResult,
     AuditRequirementCountSummary,
-    FacultyRequirementResult,
+    AuditRequirementStatus,
     PromotionRequirementResult
 } from '../types/audit'
 
 import { FacultyAuditor } from './facultyAuditor'
 import { LoadRules } from './loadRules'
 import { PromotionAuditor } from './promotionAudit'
+import { SpecializationAuditor } from './specializationAuditor'
+import { SpecializationRequirementResolver } from './specializationRequirementResolver'
+import { allocateCourses, toCourseAllocationResults } from './allocationEngine'
+import { buildAllocatedSpecializationAudit } from './allocatedSpecializationAuditor'
 
 interface RunAuditProps {
     classified_courses: CatalogueCourse[]
@@ -26,9 +30,12 @@ export function RunAudit({
 }: RunAuditProps) {
     const {
         facultyRequirements,
-        // courseRules, 
+        // courseRules,
         promotionRules,
-        courseRequirements
+        courseRequirements,
+        specializationRequirementGroups,
+        specializationRequirementCourses,
+        allocationConfigs
     } = LoadRules();
 
     // Filter for counted courses
@@ -67,16 +74,49 @@ export function RunAudit({
     console.log(promotion_requirements);
     console.log(promotion_message);
 
+    // Specialization resolver (shared across pre-allocation audit, allocation,
+    // and post-allocation specialization rebuild)
+    const specialization_resolver = new SpecializationRequirementResolver({
+        requirementGroups: specializationRequirementGroups,
+        requirementCourses: specializationRequirementCourses,
+        studentProfile: student_profile
+    });
+
+    // Pre-allocation specialization audit (internal only; not part of the
+    // public AuditResult contract)
+    const specializationAudit = SpecializationAuditor({
+        classified_courses: classified_courses,
+        specialization_requirement_groups: specializationRequirementGroups,
+        specialization_requirement_courses: specializationRequirementCourses,
+        student_course_plan: student_course_plan,
+        student_profile: student_profile
+    });
+
+    // Course allocation, using the FULL student course plan so that failed,
+    // withdrawn, planned, and in-progress attempts are all preserved
+    const allocation_rows = allocateCourses(
+        student_course_plan,
+        specializationAudit,
+        allocationConfigs,
+        specialization_resolver
+    );
+
+    const course_allocations = toCourseAllocationResults(allocation_rows);
+
+    // Post-allocation specialization requirements (the public result)
+    const specialization_requirements = buildAllocatedSpecializationAudit(
+        specializationAudit,
+        allocation_rows,
+        allocationConfigs,
+        specialization_resolver
+    );
+
+    const specialization_count_summary = createAuditRequirementCountSummary(specialization_requirements);
+
     // Create case summary
     const case_id = crypto.randomUUID();
     const counted_credits = filtered_course_plan
         .reduce((accm, cur) => accm + cur.credits, 0)
-    const dummy_req_count_summary: AuditRequirementCountSummary = {
-        satisfied: 0,
-        total: 0,
-        partial: 0,
-        missing: 0
-    }
 
     const case_summary: AuditCaseSummary = {
         case_id: case_id,
@@ -92,7 +132,7 @@ export function RunAudit({
 
         counted_credits: counted_credits,
         faculty: faculty_count_summary,
-        specialization: dummy_req_count_summary,
+        specialization: specialization_count_summary,
         promotion: {
             message: promotion_message
         },
@@ -105,9 +145,9 @@ export function RunAudit({
         schema_version: 1,
         case_summary: case_summary,
         faculty_requirements: faculty_requirements,
-        specialization_requirements: [],
+        specialization_requirements: specialization_requirements,
         promotion_requirements: promotion_requirements,
-        course_allocations: []
+        course_allocations: course_allocations
     };
 
     return audit_results;
@@ -124,7 +164,7 @@ function filterCountedCourses(
     )
 }
 
-function createAuditRequirementCountSummary(requirements: FacultyRequirementResult[]) {
+function createAuditRequirementCountSummary(requirements: { status: AuditRequirementStatus }[]) {
     const grouped_by_status = requirements.reduce<Record<string, number>>((accm, req) => {
         if (!accm[req.status]) {
             accm[req.status] = 0;
