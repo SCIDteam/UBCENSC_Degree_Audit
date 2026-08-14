@@ -74,6 +74,13 @@ export function SpecializationAuditor({
     const rows: SpecializationAuditRow[] = []
 
     for (const group of applicable_groups) {
+        if (group.requirement_area === 'Tools Elective') {
+            // Raw Tools Elective groups (rule_type: choose_n) are aggregated
+            // into a single canonical tools_elective_total row below, not
+            // emitted individually. See auditCanonicalToolsRequirement.
+            continue
+        }
+
         const rule_type = (group.rule_type ?? '').trim()
 
         if (!SUPPORTED_RULE_TYPES.has(rule_type)) {
@@ -111,6 +118,18 @@ export function SpecializationAuditor({
                 counted_course_plan
             })
         )
+    }
+
+    const tools_groups = resolver.getGroupsByRequirementArea('Tools Elective')
+
+    const tools_row = auditCanonicalToolsRequirement({
+        tools_groups,
+        resolver,
+        counted_course_plan
+    })
+
+    if (tools_row) {
+        rows.push(tools_row)
     }
 
     return rows
@@ -331,6 +350,127 @@ function matchComplementaryStudiesCourses(
     }
 
     return matched
+}
+
+interface AuditCanonicalToolsRequirementProps {
+    tools_groups: SpecializationRequirementGroup[]
+    resolver: SpecializationRequirementResolver
+    counted_course_plan: CourseAttempt[]
+}
+
+// Handler for the canonical Tools Elective requirement. Mirrors Tim's
+// _audit_canonical_tools_elective: all applicable raw Tools Elective groups
+// (requirement_area === "Tools Elective", rule_type === "choose_n") are
+// aggregated into ONE synthetic tools_elective_total row instead of being
+// emitted individually, since a program may split the same overall Tools
+// requirement across multiple raw rows (e.g. by year level).
+function auditCanonicalToolsRequirement({
+    tools_groups,
+    resolver,
+    counted_course_plan
+}: AuditCanonicalToolsRequirementProps): SpecializationAuditRow | null {
+    if (tools_groups.length === 0) {
+        return null
+    }
+
+    const required = resolveToolsRequiredCourseCount(tools_groups)
+
+    const group_ids = tools_groups.map((group) => group.group_id)
+    const eligible_course_codes = resolver.getCourseCodesForGroups(group_ids)
+
+    const matched_courses = matchDistinctCourses(
+        counted_course_plan,
+        eligible_course_codes,
+        resolver
+    )
+
+    const completed = matched_courses.length
+
+    const synthetic_group = makeCanonicalToolsGroup(tools_groups[0])
+
+    return createSpecializationAuditRow({
+        group: synthetic_group,
+        rule_type: 'tools_elective_total',
+        completed,
+        required,
+        unit: 'course',
+        matched_courses,
+        notes: ''
+    })
+}
+
+// Mirrors Tim's _resolve_tools_required_course_count: the required course
+// count is the MAXIMUM positive rule_value across applicable Tools rows
+// (not a sum, since multiple raw rows can represent the same overall
+// requirement split by year level). Falls back to total credits / 3, then 1.
+function resolveToolsRequiredCourseCount(
+    tools_groups: SpecializationRequirementGroup[]
+): number {
+    const positive_rule_values = tools_groups
+        .map((group) => group.rule_value)
+        .filter(
+            (value): value is number =>
+                typeof value === 'number' && Number.isFinite(value) && value > 0
+        )
+
+    if (positive_rule_values.length > 0) {
+        return Math.max(...positive_rule_values)
+    }
+
+    const numeric_credits = tools_groups
+        .map((group) => group.credits)
+        .filter(
+            (value): value is number =>
+                typeof value === 'number' && Number.isFinite(value)
+        )
+
+    if (numeric_credits.length > 0) {
+        const total_credits = numeric_credits.reduce((sum, value) => sum + value, 0)
+        return total_credits / 3
+    }
+
+    return 1
+}
+
+// Mirrors Tim's _make_synthetic_group for the Tools Elective canonical row.
+// Uses a deterministic representative group (the first applicable Tools
+// group in source order) for the program/calendar_year/program_type that
+// make up the synthetic group_id.
+function makeCanonicalToolsGroup(
+    representative_group: SpecializationRequirementGroup
+): SpecializationRequirementGroup {
+    const program = representative_group.program.trim().toUpperCase()
+    const calendar_year = representative_group.calendar_year.trim()
+    const program_type = representative_group.program_type.trim().toUpperCase()
+
+    const group_id = `${program}_${calendar_year}_${program_type}_TOOLS_ELECTIVE_CANONICAL_TOTAL`
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_')
+        .toUpperCase()
+
+    return {
+        group_id,
+        program,
+        calendar_year,
+        program_type,
+        year_level: null,
+        requirement_area: 'Tools Elective',
+        option_id: null,
+        option_name: null,
+        option_name_raw: null,
+        theme: null,
+        is_recommended: false,
+        label: 'Tools Elective total',
+        credits: null,
+        rule_type: 'tools_elective_total',
+        rule_value: null,
+        rule_subject: null,
+        include_pattern: null,
+        exclude_pattern: null,
+        rule_unit: 'course',
+        source_text: '',
+        unit: 'course'
+    }
 }
 
 function getRequiredTarget(
