@@ -1,218 +1,233 @@
-// import type { CatalogueCourse } from '../types/courseCatalogue'
-// import type { CourseAttempt } from '../types/coursePlan'
-// import type { StudentSetupProfile } from '../types/studentProfile'
-// import type {
-//     CourseRequirements
-// } from '../types/auditRules'
-// import type { 
-//     SpecializationRequirementResult, 
-//     AuditProgressUnit, 
-//     AuditRequirementStatus 
-// } from '../types/audit'
-// import type {
-//   AcademicYearValue,
-//   CalendarYear,
-//   OptionId,
-//   ProgramCode,
-//   ProgramType,
-// } from '../data/setupOptions'
+import type { CatalogueCourse } from '../types/courseCatalogue'
+import type { CourseAttempt } from '../types/coursePlan'
+import type { StudentSetupProfile } from '../types/studentProfile'
+import type {
+    SpecializationRequirementGroup,
+    SpecializationRequirementCourse
+} from '../types/auditRules'
+import type {
+    AuditProgressUnit,
+    AuditRequirementStatus
+} from '../types/audit'
 
-// interface SpecializationAuditorProps {
-//     courseRequirements: CourseRequirements[]
-//     student_course_plan: CourseAttempt[]
-//     student_profile: StudentSetupProfile
-// }
+import { SpecializationRequirementResolver } from './specializationRequirementResolver'
 
-// interface RecordSpecializationProps {
-//     group_id: string
-//     requirement_area: string
-//     option_id: OptionId | ''
-//     option_name: string | null
-//     theme?: string
-//     label: string
-//     rule_type: string
-//     completed: number
-//     required: number
-//     unit: AuditProgressUnit
-//     allocated_courses: string[]
-//     allocation_notes?: string
-// }
+// Internal pre-allocation specialization audit row.
+//
+// This is distinct from the public SpecializationRequirementResult contract
+// (types/audit.ts), which represents Tim's final, post-allocation result and
+// uses allocated_courses (exclusive assignments). Rows here represent
+// possible matches only, prior to the AllocationEngine's exclusive
+// assignment pass.
+export interface SpecializationAuditRow {
+    group_id: string
+    requirement_area: string
+    option_id: string | null
+    option_name: string | null
+    theme?: string
+    label: string
+    rule_type: string
+    status: AuditRequirementStatus
+    completed: number
+    required: number
+    remaining: number
+    surplus: number
+    unit: AuditProgressUnit
+    matched_courses: string[]
+    notes: string
+}
 
-// export function SpecializationAuditor({
-//     courseRequirements,
-//     student_course_plan,
-//     student_profile
-// } : SpecializationAuditorProps) {
-//     const specialization_requirements_results = [];
+interface SpecializationAuditorProps {
+    classified_courses: CatalogueCourse[]
+    specialization_requirement_groups: SpecializationRequirementGroup[]
+    specialization_requirement_courses: SpecializationRequirementCourse[]
+    student_course_plan: CourseAttempt[]
+    student_profile: StudentSetupProfile
+}
 
-//     const studentRequirementGroups = getApplicableRequirementGroups(
-//         courseRequirements, 
-//         student_profile
-//     )
+// Rule types audited by this slice. All other rule types are skipped
+// entirely (no row emitted) until their own auditors are implemented.
+const SUPPORTED_RULE_TYPES = new Set([
+    'required_course',
+    'required_all',
+    'choose_n',
+])
 
-//     const courseRequirementLookup = studentRequirementGroups
-//         .reduce<Record<string, Record<string, CourseRequirements[]>>>(
-//             (acc, req) => {
-//                 acc[req.option_id] ??= {};
-//                 acc[req.option_id][req.metric] ??= [];
-//                 acc[req.option_id][req.metric].push(req);
-//                 return acc;
-//             }, 
-//             {}
-//         );
+export function SpecializationAuditor({
+    specialization_requirement_groups,
+    specialization_requirement_courses,
+    student_course_plan,
+    student_profile
+}: SpecializationAuditorProps): SpecializationAuditRow[] {
+    const counted_course_plan = filterCountedCourses(student_course_plan)
 
-//     const {
-//         group_id, 
-//         required, 
-//         completed, 
-//         option_name
-//     } = auditCanonicalAOCMinimum(
-//         courseRequirementLookup,
-//         student_course_plan,
-//         student_profile
-//     );
+    const resolver = new SpecializationRequirementResolver({
+        requirementGroups: specialization_requirement_groups,
+        requirementCourses: specialization_requirement_courses,
+        studentProfile: student_profile
+    })
 
-//     specialization_requirements_results.push(
-//         createSpecializationRequirementResult({
-//             group_id: group_id,
-//             requirement_area: "Area of Concentration",
-//             option_id: student_profile.option_id,
-//             option_name: option_name,
-//             label: "Area of Concentration total credits",
-//             rule_type: "option_total_credits",
-//             completed: completed,
-//             required: required,
-//             unit: "credits",
-//             allocated_courses: [],
-//             allocation_notes: ''
-//         })
-//     )
-// }
+    const applicable_groups = resolver.getApplicableRequirementGroups()
 
-// function createSpecializationRequirementResult({
-//     group_id,
-//     requirement_area,
-//     option_id,
-//     option_name,
-//     theme,
-//     label,
-//     rule_type,
-//     completed,
-//     required,
-//     unit,
-//     allocated_courses,
-//     allocation_notes
-// } : RecordSpecializationProps) {
-//     const getRequirementStatus = (required: number, completed: number): AuditRequirementStatus => {
-//         if (completed >= required) return "satisfied"
-//         if (completed > 0) return "partial"
-//         return "missing"
-//     }
+    const rows: SpecializationAuditRow[] = []
 
-//     const surplus = Math.max(completed-required, 0);
-//     const remaining = Math.max(required-completed, 0);
+    for (const group of applicable_groups) {
+        const rule_type = (group.rule_type ?? '').trim()
 
-//     const total_credits_result: SpecializationRequirementResult = {
-//         group_id: group_id,
-//         requirement_area: requirement_area,
-//         option_id: option_id,
-//         option_name: option_name,
-//         theme: theme,
-//         label: label,
-//         rule_type: rule_type,
-//         status: getRequirementStatus(required, completed),
-//         completed: completed,
-//         required: required,
-//         remaining: remaining,
-//         surplus: surplus,
-//         unit: unit,
-//         allocated_courses: allocated_courses,
-//         allocation_notes: allocation_notes
-//     }
+        if (!SUPPORTED_RULE_TYPES.has(rule_type)) {
+            continue
+        }
 
-//     return total_credits_result
-// }
+        rows.push(
+            auditCourseGroup({
+                group,
+                resolver,
+                counted_course_plan
+            })
+        )
+    }
 
-// function getSelectedOptionName(
-//     courseRequirementLookup: Record<string, Record<string, CourseRequirements[]>>,
-//     option_id: string
-// ) {
-//     if (option_id.length === 0){
-//         return '';
-//     }
-//     return Object.values(courseRequirementLookup[option_id] ?? {}).flat()[0].option_name;
-// }
+    return rows
+}
 
-// function getApplicableRequirementGroups(
-//     courseRequirements: CourseRequirements[],
-//     student_profile: StudentSetupProfile
-// ) {
-//     return courseRequirements
-//         .filter(
-//             req => (
-//                 (req.program === student_profile.program || req.program === 'ALL' || req.program === '') &&
-//                 // Not considering MajorOrHonours etc.
-//                 (req.applicable_program === student_profile.program_type || req.applicable_program === 'ALL' || req.applicable_program === '') &&
-//                 (req.calendar_year === student_profile.calendar_year || req.calendar_year === 'ALL' || req.calendar_year === '') &&
+// Matches Tim's specialization_auditor.py _filter_counted_courses, and the
+// unexported filterCountedCourses in runAudit.ts. Duplicated locally here
+// per this task's constraint of not modifying runAudit.ts.
+function filterCountedCourses(
+    student_course_plan: CourseAttempt[]
+): CourseAttempt[] {
+    return student_course_plan.filter(
+        (attempt) =>
+            attempt.status === 'planned' ||
+            attempt.status === 'in_progress' ||
+            (attempt.status === 'completed' && attempt.grade === 'P')
+    )
+}
 
-//                 req.calendar_year === student_profile.calendar_year &&
-//                 req.option_id === student_profile.option_id
-//                 // is_recommended not included
-//             )
-//         )
-// }
+interface AuditCourseGroupProps {
+    group: SpecializationRequirementGroup
+    resolver: SpecializationRequirementResolver
+    counted_course_plan: CourseAttempt[]
+}
 
-// function getOptionEligibleCourseCodes() {
+// Shared handler for required_course, required_all, and choose_n rule
+// types. Mirrors Tim's _audit_course_group.
+function auditCourseGroup({
+    group,
+    resolver,
+    counted_course_plan
+}: AuditCourseGroupProps): SpecializationAuditRow {
+    const eligible_course_codes = resolver.getGroupCourseCodes(group.group_id)
 
-// }
+    const matched_courses = matchDistinctCourses(
+        counted_course_plan,
+        eligible_course_codes,
+        resolver
+    )
 
-// function auditCanonicalAOCMinimum(
-//     courseRequirementLookup: Record<string, Record<string, CourseRequirements[]>>,
-//     student_course_plan: CourseAttempt[],
-//     student_profile: StudentSetupProfile
-// ) {
-//     let metric = 'option_minimum_credits';
-//     let matched_requirements = [];
-//     let required = 0;
-//     let completed = 0;
+    const rule_type = (group.rule_type ?? '').trim()
+    const required = getRequiredTarget(rule_type, group, eligible_course_codes)
+    const completed = matched_courses.length
 
-//     matched_requirements = courseRequirementLookup[metric]?.[student_profile.option_id] ?? [];
+    return createSpecializationAuditRow({
+        group,
+        rule_type,
+        completed,
+        required,
+        unit: 'course',
+        matched_courses,
+        notes: ''
+    })
+}
 
-//     // Prefer option-specific minimum-credit rows
-//     // Fall back to generic option minimums
-//     // Seems to only be applicable for 2024-2025 calendar year
-//     if (matched_requirements.length !== 0) {
-//         required = matched_requirements
-//             .reduce((max, cur) => Math.max(max, cur.value), 0)
-//     }
-//     else {
-//         // Fall back to summing table-split AoC credit rows.
-//         metric = 'area_of_concentration_credits';
-//         matched_requirements = courseRequirementLookup[metric]?.[student_profile.option_id] ?? [];
+function matchDistinctCourses(
+    counted_course_plan: CourseAttempt[],
+    eligible_course_codes: string[],
+    resolver: SpecializationRequirementResolver
+): string[] {
+    const seen = new Set<string>()
+    const matched: string[] = []
 
-//         if (matched_requirements.length !== 0) {
-//             const aoc_credits = courseRequirementLookup[`${metric}&`] ?? null;
-//             if (aoc_credits !== null) {
-//                 required = matched_requirements
-//                     .reduce((accm, cur) => accm + cur.value, 0)
-//             }
-//         }
-//     }
+    for (const attempt of counted_course_plan) {
+        if (seen.has(attempt.course_code)) {
+            continue
+        }
 
-//     const option_name = getSelectedOptionName(
-//         courseRequirementLookup, student_profile.option_id
-//     )
+        if (resolver.courseMatchesAnyEligible(attempt.course_code, eligible_course_codes)) {
+            seen.add(attempt.course_code)
+            matched.push(attempt.course_code)
+        }
+    }
 
-//     let group_id = '';
-//     if (student_profile.option_id === '') {
-//         group_id = `${student_profile.program}` +
-//             `${student_profile.calendar_year}` +
-//             `${student_profile.program_type}` +
-//             `AOC_NO_OPTION_CANONICAL_TOTAL_CREDITS`
+    return matched
+}
 
-//         group_id = group_id.replaceAll(/-| /g, '_')
-//         return {group_id, required, completed, option_name}
-//     }
+function getRequiredTarget(
+    rule_type: string,
+    group: SpecializationRequirementGroup,
+    eligible_course_codes: string[]
+): number {
+    if (rule_type === 'required_course') {
+        return 1
+    }
 
-//     return {group_id, required, completed, option_name}
-// }
+    if (rule_type === 'required_all') {
+        return new Set(eligible_course_codes).size
+    }
+
+    // choose_n
+    const rule_value = group.rule_value
+
+    if (typeof rule_value === 'number' && Number.isFinite(rule_value) && rule_value > 0) {
+        return rule_value
+    }
+
+    return 1
+}
+
+interface CreateSpecializationAuditRowProps {
+    group: SpecializationRequirementGroup
+    rule_type: string
+    completed: number
+    required: number
+    unit: AuditProgressUnit
+    matched_courses: string[]
+    notes: string
+}
+
+function createSpecializationAuditRow({
+    group,
+    rule_type,
+    completed,
+    required,
+    unit,
+    matched_courses,
+    notes
+}: CreateSpecializationAuditRowProps): SpecializationAuditRow {
+    const getRequirementStatus = (required: number, completed: number): AuditRequirementStatus => {
+        if (completed >= required) return 'satisfied'
+        if (completed > 0) return 'partial'
+        return 'missing'
+    }
+
+    const remaining = Math.max(required - completed, 0)
+    const surplus = Math.max(completed - required, 0)
+
+    return {
+        group_id: group.group_id,
+        requirement_area: group.requirement_area,
+        option_id: group.option_id,
+        option_name: group.option_name,
+        theme: group.theme || undefined,
+        label: group.label,
+        rule_type: rule_type,
+        status: getRequirementStatus(required, completed),
+        completed: completed,
+        required: required,
+        remaining: remaining,
+        surplus: surplus,
+        unit: unit,
+        matched_courses: matched_courses,
+        notes: notes
+    }
+}
