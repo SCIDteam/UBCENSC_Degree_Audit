@@ -1,5 +1,6 @@
 import type { CourseAttempt, PlannerTerm } from '../types/coursePlan'
 import type { AllocationConfigRule, AllocationConfigs } from '../types/auditRules'
+import type { CourseAllocationResult } from '../types/audit'
 import type { SpecializationAuditRow } from './specializationAuditor'
 import type { SpecializationRequirementResolver } from './specializationRequirementResolver'
 
@@ -923,4 +924,234 @@ export function allocateResidualElectives(
     }
 
     return rows
+}
+
+// ---------------------------------------------------------------------------
+// Global allocation execution loop (Slice 8)
+// ---------------------------------------------------------------------------
+//
+// Mirrors the bucket-dispatch stage of Tim's AllocationEngine.allocate():
+//
+//   for bucket in self.config.priority_order:
+//       if bucket == "core": ...
+//       elif bucket == "tools": ...
+//       elif bucket == "option": ...
+//       elif bucket == "complementary": ...
+//       elif bucket == self.config.residual_bucket: ...
+//
+// which is a plain if/elif chain, evaluated once per configured bucket in
+// self.config.priority_order (already calendar-ordered by the time allocate()
+// sees it). This function reproduces exactly that: build the calendar-ordered
+// passes once via buildAllocationPasses (which already sorted by config
+// priority — see getOrderedAllocationConfig), then dispatch each pass, in the
+// order given, to the one allocator whose bucket literal matches.
+//
+// DISPATCH TABLE (exact, matches Tim's if/elif chain one-for-one):
+//   core          -> allocateCoreRequirements
+//   tools         -> allocateToolsRequirement
+//   option        -> allocateOptionRequirements
+//   complementary -> allocateComplementaryRequirement
+//   electives     -> allocateResidualElectives  (Tim's self.config.residual_bucket;
+//                     AllocationConfigRule has no residual_bucket field and
+//                     neither calendar's CSV overrides it, so 'electives' is
+//                     the literal default residual bucket name here too — see
+//                     the "Residual Electives allocation" note above.)
+//
+// UNKNOWN BUCKET BEHAVIOR: Tim's if/elif chain has no branch for a bucket
+// name it doesn't recognize, so that iteration of his `for bucket in
+// self.config.priority_order` loop does nothing — the DataFrame passes
+// through that iteration completely unchanged, and the loop moves on to the
+// next bucket. This function reproduces that exactly via the `default` case
+// below: an unrecognized pass.config.bucket is skipped (no allocator is
+// called, rows are left as-is), NOT remapped to electives or any other
+// bucket. This is a deliberate no-op, not an error, matching Tim's silent
+// fallthrough.
+//
+// CALENDAR ORDER: this function does not sort or re-derive bucket order.
+// buildAllocationPasses already returns passes sorted by
+// getOrderedAllocationConfig (config priority ascending, tie-broken by
+// bucket name), which is itself calendar-specific via
+// resolver.getAllocationConfigForCalendar. This loop simply iterates
+// `passes` in the order given — e.g. 2024-2025 yields core, tools, option,
+// complementary, electives, while 2026-2027 yields complementary, core,
+// tools, option, electives (per that calendar's allocation_config.csv
+// priorities). No bucket sequence is hardcoded here.
+//
+// MISSING CONFIG: if the student's calendar_year has no entry in
+// allocationConfigs, getAllocationConfigForCalendar (via
+// getOrderedAllocationConfig) returns [], so buildAllocationPasses returns
+// [] and this loop's body never executes. That matches Tim's behavior for
+// an empty self.config.priority_order (an empty iterable for-loop is a
+// no-op in Python; there is no explicit "missing config" error path in
+// allocate() to preserve or diverge from). rows are returned exactly as
+// prepareAllocationRows built them: every attempt present, non-counted rows
+// marked not_counted_status, counted rows unallocated (empty
+// exclusive_requirement_area, allocation_priority null, allocation_method
+// '').
+//
+// OVERRIDE GAP: Tim's allocate() calls self._apply_allocation_overrides(...)
+// immediately after _add_allocation_sort_columns and BEFORE the bucket loop
+// above (see allocation_engine.py's allocate(), the call directly preceding
+// `for bucket in self.config.priority_order:`). This frontend function
+// intentionally does NOT call anything equivalent: CourseAttempt has no
+// override/effective-course-code contract yet (see AllocationWorkingRow's
+// "KNOWN LIMITATIONS" #1 at the top of this file), so there is nothing
+// truthful to apply overrides from. allocateCourses therefore goes straight
+// from prepareAllocationRows into the priority bucket passes. This is an
+// explicit, deferred gap, not an oversight — do not simulate override
+// behavior here.
+//
+// NOT DONE HERE (later slices, per Tim's allocate() after the bucket loop):
+// also_counts_toward population, double-counting, and the
+// CourseAllocationResult conversion. This function returns the raw
+// AllocationWorkingRow[] working set only.
+//
+// MUTATION MODEL: every allocate*Requirement helper mutates the
+// AllocationWorkingRow objects in `rows` in place and returns that same
+// array reference. This loop calls them for their mutation side effect only
+// and does not reassign or clone `rows` between passes, so exclusive
+// assignments made by an earlier pass (e.g. core) are visible to every
+// later pass's getUnallocatedCountedRows / getEligibleUnallocatedRowsForRequirement
+// calls (e.g. tools, option, complementary, electives) — required for
+// cross-bucket exclusivity, exactly as in Tim's single shared `allocation`
+// DataFrame.
+export function allocateCourses(
+    student_course_plan: CourseAttempt[],
+    specializationAudit: SpecializationAuditRow[],
+    allocationConfigs: AllocationConfigs,
+    resolver: SpecializationRequirementResolver
+): AllocationWorkingRow[] {
+    const rows = prepareAllocationRows(student_course_plan)
+    const passes = buildAllocationPasses(allocationConfigs, resolver, specializationAudit)
+
+    for (const pass of passes) {
+        switch (pass.config.bucket) {
+            case 'core':
+                allocateCoreRequirements(rows, pass)
+                break
+            case 'tools':
+                allocateToolsRequirement(rows, pass)
+                break
+            case 'option':
+                allocateOptionRequirements(rows, pass)
+                break
+            case 'complementary':
+                allocateComplementaryRequirement(rows, pass)
+                break
+            case 'electives':
+                allocateResidualElectives(rows, pass)
+                break
+            default:
+                // Unrecognized bucket: matches no branch in Tim's if/elif
+                // chain, so this pass is silently skipped. Do not remap to
+                // electives or any other bucket.
+                break
+        }
+    }
+
+    return rows
+}
+
+// ---------------------------------------------------------------------------
+// Public CourseAllocationResult conversion (Slice 9)
+// ---------------------------------------------------------------------------
+//
+// Converts the internal AllocationWorkingRow[] working set into the public
+// CourseAllocationResult[] contract (types/audit.ts). This is the boundary
+// between AllocationEngine's internal representation and the rest of the
+// app: internal-only fields (attempt, working_course_code,
+// status_sort_priority, original_order, sortable_term_key,
+// exclusive_rule_type, allocation_priority, override_used) are deliberately
+// dropped here, matching Tim's allocate(), which similarly drops its
+// internal sort columns (_status_priority, _original_order) before returning
+// the final DataFrame.
+//
+// One AllocationWorkingRow always produces exactly one CourseAllocationResult
+// — no filtering, splitting, or merging. Every original attempt stays
+// represented, including non-counted (failed/withdrawn) and still-planned
+// attempts.
+
+// Matches the fixture convention documented in utils/exampleAuditResult.ts:
+// bucket falls back to allocation_method when exclusive_bucket is blank,
+// since bucket is a required field on CourseAllocationResult. Non-counted
+// rows always have a blank exclusive_bucket and allocation_method ===
+// "not_counted_status" (see prepareAllocationRows), so they resolve to
+// "not_counted_status" here, exactly like the fixture.
+//
+// Counted rows can still have a blank exclusive_bucket AND a blank
+// allocation_method only when the student's calendar has no allocation
+// config (buildAllocationPasses returns [] — see allocateCourses' "MISSING
+// CONFIG" note): every bucket pass is skipped, so nothing ever assigns
+// exclusive_bucket or allocation_method. Falling back to allocation_method
+// in that case would produce "", which is not a real bucket and cannot
+// stand in for one. The literal string "unallocated" is used instead — this
+// is not a fabricated allocation, it is a recognized alias already wired
+// into the UI's "Excluded / Not Counted" bucket group (see
+// components/audit/auditBucketStyles.ts BUCKET_STYLES "excluded" entry,
+// whose allocationBucketAliases already includes "unallocated" for exactly
+// this case).
+function resolveAllocationBucket(row: AllocationWorkingRow): string {
+    if (row.exclusive_bucket.trim() !== '') {
+        return row.exclusive_bucket
+    }
+
+    if (row.counted) {
+        return 'unallocated'
+    }
+
+    return row.allocation_method
+}
+
+// Converts one AllocationWorkingRow into one CourseAllocationResult, mapping
+// every field of the public contract from either the original CourseAttempt
+// (identity/attempt fields Tim's allocation output leaves untouched) or the
+// working row's own allocation columns (fields Tim's allocate() writes).
+// course_code is read from row.course_code (not working_course_code): both
+// are equal today (see AllocationWorkingRow's KNOWN LIMITATIONS #1), but
+// course_code is the field name that survives the internal/public boundary.
+function toCourseAllocationResult(row: AllocationWorkingRow): CourseAllocationResult {
+    return {
+        row_id: row.attempt_id,
+        attempt_id: row.attempt_id,
+        course_code: row.course_code,
+        year_taken: row.attempt.year_taken,
+        credits: row.attempt.credits,
+        status: row.attempt.status,
+        grade: row.attempt.grade,
+        percentage: row.attempt.percentage,
+        bucket: resolveAllocationBucket(row),
+        allocation_method: row.allocation_method,
+        allocation_notes: row.allocation_notes,
+        counted: row.counted,
+        exclusive_requirement_area: row.exclusive_requirement_area,
+        exclusive_group_id: row.exclusive_group_id,
+        exclusive_label: row.exclusive_label,
+        also_counts_toward: row.also_counts_toward,
+        double_count_allowed: row.double_count_allowed,
+        double_count_groups: row.double_count_groups,
+    }
+}
+
+// Converts the full AllocationWorkingRow[] working set produced by
+// allocateCourses into the public CourseAllocationResult[] contract. Order is
+// preserved 1:1 with the input array (no re-sorting, no filtering).
+export function toCourseAllocationResults(
+    rows: AllocationWorkingRow[]
+): CourseAllocationResult[] {
+    return rows.map(toCourseAllocationResult)
+}
+
+// Convenience wrapper combining allocateCourses + toCourseAllocationResults
+// for callers that only need the public contract and don't need the
+// intermediate AllocationWorkingRow[] working set. Not yet wired into
+// runAudit.ts — see Slice 9 task scope.
+export function runAllocation(
+    student_course_plan: CourseAttempt[],
+    specializationAudit: SpecializationAuditRow[],
+    allocationConfigs: AllocationConfigs,
+    resolver: SpecializationRequirementResolver
+): CourseAllocationResult[] {
+    return toCourseAllocationResults(
+        allocateCourses(student_course_plan, specializationAudit, allocationConfigs, resolver)
+    )
 }
