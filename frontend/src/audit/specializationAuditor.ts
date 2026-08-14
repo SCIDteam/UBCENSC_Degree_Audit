@@ -53,6 +53,7 @@ const SUPPORTED_RULE_TYPES = new Set([
     'choose_n',
     'level_requirement',
     'complementary_studies_credits',
+    'theme_minimum',
 ])
 
 export function SpecializationAuditor({
@@ -119,6 +120,18 @@ export function SpecializationAuditor({
             if (row) {
                 rows.push(row)
             }
+            continue
+        }
+
+        if (rule_type === 'theme_minimum') {
+            rows.push(
+                auditThemeMinimum({
+                    group,
+                    resolver,
+                    counted_course_plan,
+                    student_profile
+                })
+            )
             continue
         }
 
@@ -361,6 +374,80 @@ function matchComplementaryStudiesCourses(
     }
 
     return matched
+}
+
+interface AuditThemeMinimumProps {
+    group: SpecializationRequirementGroup
+    resolver: SpecializationRequirementResolver
+    counted_course_plan: CourseAttempt[]
+    student_profile: StudentSetupProfile
+}
+
+// Handler for theme_minimum. Mirrors Tim's _audit_theme_minimum: the
+// selected option's Area of Concentration eligible courses are grouped by
+// theme (resolver.getOptionCoursesByTheme), and a theme counts as completed
+// as soon as at least one distinct counted course matches that theme's
+// eligible list. completed is the number of completed themes (not matched
+// courses), required is the group's rule_value (default 0, no positivity
+// floor, matching Tim's _safe_rule_value default). matched_courses is the
+// union of distinct matched course codes across all completed themes.
+function auditThemeMinimum({
+    group,
+    resolver,
+    counted_course_plan,
+    student_profile
+}: AuditThemeMinimumProps): SpecializationAuditRow {
+    const option_id = (group.option_id ?? '').trim() || (student_profile.option_id ?? '').trim()
+
+    const rule_value = group.rule_value
+    const required = typeof rule_value === 'number' && Number.isFinite(rule_value) ? rule_value : 0
+
+    if (!option_id) {
+        return createSpecializationAuditRow({
+            group,
+            rule_type: 'theme_minimum',
+            completed: 0,
+            required,
+            unit: 'categories',
+            matched_courses: [],
+            notes: 'No option_id available for theme minimum.'
+        })
+    }
+
+    const courses_by_theme = resolver.getOptionCoursesByTheme(option_id)
+
+    const completed_themes: string[] = []
+    const matched_courses_set = new Set<string>()
+
+    for (const theme of Array.from(courses_by_theme.keys()).sort()) {
+        const eligible_course_codes = courses_by_theme.get(theme) ?? []
+
+        const matched_courses = matchDistinctCourses(
+            counted_course_plan,
+            eligible_course_codes,
+            resolver
+        )
+
+        if (matched_courses.length === 0) {
+            continue
+        }
+
+        completed_themes.push(theme)
+
+        for (const course_code of matched_courses) {
+            matched_courses_set.add(course_code)
+        }
+    }
+
+    return createSpecializationAuditRow({
+        group,
+        rule_type: 'theme_minimum',
+        completed: completed_themes.length,
+        required,
+        unit: 'categories',
+        matched_courses: Array.from(matched_courses_set),
+        notes: `Completed themes: ${completed_themes.join(';')}`
+    })
 }
 
 interface AuditCanonicalToolsRequirementProps {

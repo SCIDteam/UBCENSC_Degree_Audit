@@ -272,6 +272,63 @@ export class SpecializationRequirementResolver {
         )
     }
 
+    // Groups Area of Concentration eligible course codes by theme for the
+    // given option. Mirrors Tim's requirement_courses filter inside
+    // _audit_theme_minimum: requirement_area === 'Area of Concentration',
+    // matching option_id, and non-empty theme. Unlike
+    // getOptionEligibleCourseCodes, is_recommended is intentionally NOT
+    // filtered here, matching Tim's theme_minimum behavior of letting
+    // recommended AoC rows contribute to theme coverage.
+    getOptionCoursesByTheme(optionId: string): Map<string, string[]> {
+        const coursesByTheme = new Map<string, string[]>()
+
+        for (const course of this.requirementCourses) {
+            if (course.requirement_area !== 'Area of Concentration') {
+                continue
+            }
+
+            if (course.option_id !== optionId) {
+                continue
+            }
+
+            const theme = (course.theme ?? '').trim()
+
+            if (theme === '') {
+                continue
+            }
+
+            const matchesProgram =
+                course.program === this.studentProfile.program ||
+                course.program === 'ALL' ||
+                course.program === ''
+
+            const matchesCalendar =
+                course.calendar_year === this.studentProfile.calendar_year ||
+                course.calendar_year === 'ALL' ||
+                course.calendar_year === ''
+
+            const matchesProgramType =
+                course.program_type === this.studentProfile.program_type ||
+                course.program_type === 'All' ||
+                course.program_type === 'ALL' ||
+                course.program_type === ''
+
+            if (!matchesProgram || !matchesCalendar || !matchesProgramType) {
+                continue
+            }
+
+            const existing = coursesByTheme.get(theme)
+
+            if (existing) {
+                existing.push(course.course_code)
+            } else {
+                coursesByTheme.set(theme, [course.course_code])
+            }
+        }
+
+        return coursesByTheme
+    }
+
     getComplementaryStudiesEligibleCourseCodes(): string[] {
         return Array.from(
             new Set(
