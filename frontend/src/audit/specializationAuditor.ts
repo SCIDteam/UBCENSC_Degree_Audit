@@ -52,6 +52,7 @@ const SUPPORTED_RULE_TYPES = new Set([
     'required_all',
     'choose_n',
     'level_requirement',
+    'complementary_studies_credits',
 ])
 
 export function SpecializationAuditor({
@@ -87,6 +88,19 @@ export function SpecializationAuditor({
                     counted_course_plan
                 })
             )
+            continue
+        }
+
+        if (rule_type === 'complementary_studies_credits') {
+            const row = auditComplementaryStudiesCredits({
+                group,
+                resolver,
+                counted_course_plan
+            })
+
+            if (row) {
+                rows.push(row)
+            }
             continue
         }
 
@@ -244,6 +258,73 @@ function matchLevelRequirementCourses(
         }
 
         if (resolver.courseMatchesLevelRequirement(attempt.subject, attempt.course_number, group)) {
+            seen.add(attempt.course_code)
+            matched.push({ course_code: attempt.course_code, credits: attempt.credits })
+        }
+    }
+
+    return matched
+}
+
+interface AuditComplementaryStudiesCreditsProps {
+    group: SpecializationRequirementGroup
+    resolver: SpecializationRequirementResolver
+    counted_course_plan: CourseAttempt[]
+}
+
+// Handler for complementary_studies_credits. Mirrors Tim's
+// _audit_complementary_studies_credits, which delegates to
+// _audit_canonical_credit_requirement: eligible courses come from the
+// resolver's complementary-studies eligibility set (not this group's own
+// course list), the required target is the group's credits field, and no
+// row is emitted when that target is not positive.
+function auditComplementaryStudiesCredits({
+    group,
+    resolver,
+    counted_course_plan
+}: AuditComplementaryStudiesCreditsProps): SpecializationAuditRow | null {
+    const required = typeof group.credits === 'number' && Number.isFinite(group.credits) ? group.credits : 0
+
+    if (required <= 0) {
+        return null
+    }
+
+    const eligible_course_codes = resolver.getComplementaryStudiesEligibleCourseCodes()
+
+    const matched = matchComplementaryStudiesCourses(
+        counted_course_plan,
+        eligible_course_codes,
+        resolver
+    )
+
+    const matched_courses = matched.map((course) => course.course_code)
+    const completed = matched.reduce((sum, course) => sum + course.credits, 0)
+
+    return createSpecializationAuditRow({
+        group,
+        rule_type: 'complementary_studies_credits',
+        completed,
+        required,
+        unit: 'credits',
+        matched_courses,
+        notes: ''
+    })
+}
+
+function matchComplementaryStudiesCourses(
+    counted_course_plan: CourseAttempt[],
+    eligible_course_codes: string[],
+    resolver: SpecializationRequirementResolver
+): { course_code: string; credits: number }[] {
+    const seen = new Set<string>()
+    const matched: { course_code: string; credits: number }[] = []
+
+    for (const attempt of counted_course_plan) {
+        if (seen.has(attempt.course_code)) {
+            continue
+        }
+
+        if (resolver.courseMatchesAnyEligible(attempt.course_code, eligible_course_codes)) {
             seen.add(attempt.course_code)
             matched.push({ course_code: attempt.course_code, credits: attempt.credits })
         }
