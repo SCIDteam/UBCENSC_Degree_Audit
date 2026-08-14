@@ -749,3 +749,92 @@ export function allocateOptionRequirements(
 
     return rows
 }
+
+// ---------------------------------------------------------------------------
+// Complementary Studies allocation (Slice 6)
+// ---------------------------------------------------------------------------
+
+const COMPLEMENTARY_ALLOCATION_PRIORITY = 40
+const COMPLEMENTARY_ALLOCATION_METHOD = 'priority_complementary'
+
+// Allocates the canonical Complementary Studies requirement only. No-ops
+// (returns rows unchanged) unless pass.config.bucket === 'complementary'.
+//
+// Mirrors Tim's _allocate_canonical_credit_bucket(bucket="complementary",
+// priority=40, method="priority_complementary") — the same canonical-bucket
+// shape as allocateToolsRequirement, but credit-based instead of count-based,
+// and with the same "top-up" subtraction Stage 2 of allocateOptionRequirements
+// uses (there is no "specific requirement" stage here; Complementary has only
+// the one canonical credit bucket):
+// 1. Find the canonical Complementary row: pass.requirements filtered to
+//    rule_type in config.canonical_rule_types (not hardcoded to
+//    'complementary_studies_credits'), taking only the first match (Tim's
+//    canonical_rows_for_bucket -> rows.iloc[0]). No canonical row is a no-op.
+// 2. required_credits = canonical row's required. required_credits <= 0 is a
+//    no-op (Tim's `if required_credits <= 0` — reached via the shared
+//    remaining_credits <= 0 check below, since already_allocated_credits is
+//    never negative).
+// 3. already_allocated_credits = sum of attempt.credits over every row
+//    currently exclusive_bucket === 'complementary' (Tim's
+//    `df[df["exclusive_bucket"] == bucket]["credits"].sum()`), so any course
+//    an earlier bucket/override already placed in 'complementary' (not
+//    possible yet in this frontend, since overrides are deferred, but
+//    reproduced for parity) reduces the target. remaining_credits =
+//    max(required_credits - already_allocated_credits, 0); <= 0 is a no-op.
+// 4. Eligibility reuses the canonical row's own matched_courses via
+//    getEligibleUnallocatedRowsForRequirement (substituting for Tim's
+//    resolver.get_eligible_courses_by_bucket, the same deliberate
+//    simplification already used for Tools/Option).
+// 5. Selection uses selectRowsByCredits directly (Tim's
+//    _select_unallocated_eligible_indices_by_credits), since the canonical
+//    Complementary row is always unit === 'credits' by construction.
+// 6. Assignment uses priority=40 and method "priority_complementary" (fixed
+//    string, NOT rule_type-suffixed — matches Tools and Option's total stage,
+//    not Option's specific stage).
+//
+// Mutates the AllocationWorkingRow objects referenced by `rows` in place and
+// returns the same array reference, preserving row identity, count, and
+// order; non-counted and non-complementary rows are untouched. This function
+// does not hardcode calendar bucket ordering — pass.config.bucket already
+// reflects whichever calendar-specific priority put 'complementary' in this
+// pass, so the same code runs regardless of whether Complementary precedes or
+// follows Core/Tools/Option for a given calendar.
+export function allocateComplementaryRequirement(
+    rows: AllocationWorkingRow[],
+    pass: AllocationPass
+): AllocationWorkingRow[] {
+    if (pass.config.bucket !== 'complementary') {
+        return rows
+    }
+
+    const canonicalRuleTypes = splitSemicolonList(pass.config.canonical_rule_types)
+
+    const canonicalRow = pass.requirements.find((requirement) =>
+        canonicalRuleTypes.includes(requirement.rule_type)
+    )
+
+    if (!canonicalRow) {
+        return rows
+    }
+
+    const requiredCredits = canonicalRow.required
+    const alreadyAllocatedCredits = sumAllocatedCreditsForBucket(rows, pass.config.bucket)
+    const remainingCredits = Math.max(requiredCredits - alreadyAllocatedCredits, 0)
+
+    if (remainingCredits <= 0) {
+        return rows
+    }
+
+    const eligibleRows = getEligibleUnallocatedRowsForRequirement(rows, canonicalRow)
+    const selectedRows = selectRowsByCredits(eligibleRows, remainingCredits)
+
+    applyExclusiveAssignment(
+        selectedRows,
+        canonicalRow,
+        pass.config,
+        COMPLEMENTARY_ALLOCATION_PRIORITY,
+        COMPLEMENTARY_ALLOCATION_METHOD
+    )
+
+    return rows
+}
