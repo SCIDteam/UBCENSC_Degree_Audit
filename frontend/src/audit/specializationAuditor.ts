@@ -51,6 +51,7 @@ const SUPPORTED_RULE_TYPES = new Set([
     'required_course',
     'required_all',
     'choose_n',
+    'level_requirement',
 ])
 
 export function SpecializationAuditor({
@@ -75,6 +76,17 @@ export function SpecializationAuditor({
         const rule_type = (group.rule_type ?? '').trim()
 
         if (!SUPPORTED_RULE_TYPES.has(rule_type)) {
+            continue
+        }
+
+        if (rule_type === 'level_requirement') {
+            rows.push(
+                auditLevelRequirement({
+                    group,
+                    resolver,
+                    counted_course_plan
+                })
+            )
             continue
         }
 
@@ -156,6 +168,84 @@ function matchDistinctCourses(
         if (resolver.courseMatchesAnyEligible(attempt.course_code, eligible_course_codes)) {
             seen.add(attempt.course_code)
             matched.push(attempt.course_code)
+        }
+    }
+
+    return matched
+}
+
+interface AuditLevelRequirementProps {
+    group: SpecializationRequirementGroup
+    resolver: SpecializationRequirementResolver
+    counted_course_plan: CourseAttempt[]
+}
+
+// Handler for level_requirement. Mirrors Tim's _audit_level_requirement,
+// except completed is not capped at required (see module-level notes in
+// createSpecializationAuditRow callers): this pre-allocation row preserves
+// the full qualifying amount so surplus can be displayed.
+function auditLevelRequirement({
+    group,
+    resolver,
+    counted_course_plan
+}: AuditLevelRequirementProps): SpecializationAuditRow {
+    const matched = matchLevelRequirementCourses(counted_course_plan, group, resolver)
+    const matched_courses = matched.map((course) => course.course_code)
+
+    const rule_unit = (group.rule_unit ?? '').trim().toLowerCase()
+
+    let completed: number
+    let required: number
+    let unit: AuditProgressUnit
+
+    if (rule_unit === 'credits') {
+        completed = matched.reduce((sum, course) => sum + course.credits, 0)
+        required = typeof group.credits === 'number' && Number.isFinite(group.credits) ? group.credits : 0
+        unit = 'credits'
+    } else {
+        // rule_unit === 'course' (Tim's default branch)
+        completed = matched.length
+        required = getLevelRequirementCourseTarget(group)
+        unit = 'course'
+    }
+
+    return createSpecializationAuditRow({
+        group,
+        rule_type: 'level_requirement',
+        completed,
+        required,
+        unit,
+        matched_courses,
+        notes: ''
+    })
+}
+
+function getLevelRequirementCourseTarget(group: SpecializationRequirementGroup): number {
+    const rule_value = group.rule_value
+
+    if (typeof rule_value === 'number' && Number.isFinite(rule_value) && rule_value > 0) {
+        return rule_value
+    }
+
+    return 1
+}
+
+function matchLevelRequirementCourses(
+    counted_course_plan: CourseAttempt[],
+    group: SpecializationRequirementGroup,
+    resolver: SpecializationRequirementResolver
+): { course_code: string; credits: number }[] {
+    const seen = new Set<string>()
+    const matched: { course_code: string; credits: number }[] = []
+
+    for (const attempt of counted_course_plan) {
+        if (seen.has(attempt.course_code)) {
+            continue
+        }
+
+        if (resolver.courseMatchesLevelRequirement(attempt.subject, attempt.course_number, group)) {
+            seen.add(attempt.course_code)
+            matched.push({ course_code: attempt.course_code, credits: attempt.credits })
         }
     }
 
