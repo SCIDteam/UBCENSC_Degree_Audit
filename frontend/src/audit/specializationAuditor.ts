@@ -12,6 +12,8 @@ import type {
 
 import { SpecializationRequirementResolver } from './specializationRequirementResolver'
 
+type SpecializationAuditStatus = AuditRequirementStatus | 'review'
+
 // Internal pre-allocation specialization audit row.
 //
 // This is distinct from the public SpecializationRequirementResult contract
@@ -27,7 +29,7 @@ export interface SpecializationAuditRow {
     theme?: string
     label: string
     rule_type: string
-    status: AuditRequirementStatus
+    status: SpecializationAuditStatus
     completed: number
     required: number
     remaining: number
@@ -93,7 +95,20 @@ export function SpecializationAuditor({
             continue
         }
 
+        if (group.requirement_area === "Communication Requirement") {
+            // Communication Requirement is handled by the FacultyAuditor, not
+            // the SpecializationAuditor.
+            continue
+        }
+
         const rule_type = (group.rule_type ?? '').trim()
+
+        if (rule_type === 'course_list_review') {
+            rows.push(
+                createManualReviewRow(group)
+            )
+            continue
+        }
 
         if (!SUPPORTED_RULE_TYPES.has(rule_type)) {
             continue
@@ -179,6 +194,28 @@ interface AuditCourseGroupProps {
     counted_course_plan: CourseAttempt[]
 }
 
+
+function createManualReviewRow(
+    group: SpecializationRequirementGroup
+): SpecializationAuditRow {
+    return {
+        group_id: group.group_id,
+        requirement_area: group.requirement_area,
+        option_id: group.option_id,
+        option_name: group.option_name,
+        theme: group.theme || undefined,
+        label: group.label,
+        rule_type: group.rule_type,
+        status: 'review',
+        completed: 0,
+        required: 0,
+        remaining: 0,
+        surplus: 0,
+        unit: 'course',
+        matched_courses: [],
+        notes: `Rule type '${group.rule_type}' requires manual review.`
+    }
+}
 // Shared handler for required_course, required_all, and choose_n rule
 // types. Mirrors Tim's _audit_course_group.
 function auditCourseGroup({
