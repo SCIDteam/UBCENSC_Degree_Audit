@@ -256,11 +256,15 @@ export class SpecializationRequirementResolver {
 
                         const matchesOption = course.option_id === optionId
 
+                        const matchesRequirementArea =
+                            course.requirement_area === 'Area of Concentration'
+
                         return (
                             matchesProgram &&
                             matchesCalendar &&
                             matchesProgramType &&
-                            matchesOption
+                            matchesOption &&
+                            matchesRequirementArea
                         )
                     })
                     .map((course) => course.course_code),

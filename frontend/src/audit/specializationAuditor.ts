@@ -73,6 +73,17 @@ export function SpecializationAuditor({
 
     const rows: SpecializationAuditRow[] = []
 
+    const aoc_row = auditCanonicalAreaOfConcentration({
+        applicable_groups,
+        resolver,
+        counted_course_plan,
+        student_profile
+    })
+
+    if (aoc_row) {
+        rows.push(aoc_row)
+    }
+
     for (const group of applicable_groups) {
         if (group.requirement_area === 'Tools Elective') {
             // Raw Tools Elective groups (rule_type: choose_n) are aggregated
@@ -471,6 +482,246 @@ function makeCanonicalToolsGroup(
         source_text: '',
         unit: 'course'
     }
+}
+
+interface CanonicalAreaOfConcentrationResolution {
+    requiredCredits: number
+    sourceGroups: SpecializationRequirementGroup[]
+}
+
+function isValidCredits(value: number | null): value is number {
+    return typeof value === 'number' && Number.isFinite(value)
+}
+
+// Mirrors Tim's _resolve_canonical_aoc_credit_requirement precedence:
+// 1. option-specific option_minimum_credits rows (max credits)
+// 2. generic (no option_id) option_minimum_credits rows (max credits)
+// 3. area_of_concentration_credits rows (summed credits)
+// Only rows with numeric credits are considered at each tier.
+function resolveCanonicalAreaOfConcentrationCreditRequirement(
+    applicable_groups: SpecializationRequirementGroup[],
+    student_profile: StudentSetupProfile
+): CanonicalAreaOfConcentrationResolution | null {
+    const profile_option_id = (student_profile.option_id ?? '').trim().toUpperCase()
+
+    const aoc_groups = applicable_groups.filter(
+        (group) => group.requirement_area === 'Area of Concentration'
+    )
+
+    const option_specific = aoc_groups.filter((group) => {
+        if (group.rule_type !== 'option_minimum_credits') return false
+        if (!isValidCredits(group.credits)) return false
+        const group_option_id = (group.option_id ?? '').trim().toUpperCase()
+        return group_option_id !== '' && group_option_id === profile_option_id
+    })
+
+    if (option_specific.length > 0) {
+        return {
+            requiredCredits: Math.max(...option_specific.map((group) => group.credits as number)),
+            sourceGroups: option_specific
+        }
+    }
+
+    const generic = aoc_groups.filter((group) => {
+        if (group.rule_type !== 'option_minimum_credits') return false
+        if (!isValidCredits(group.credits)) return false
+        return (group.option_id ?? '').trim() === ''
+    })
+
+    if (generic.length > 0) {
+        return {
+            requiredCredits: Math.max(...generic.map((group) => group.credits as number)),
+            sourceGroups: generic
+        }
+    }
+
+    const area_credits_rows = aoc_groups.filter(
+        (group) => group.rule_type === 'area_of_concentration_credits' && isValidCredits(group.credits)
+    )
+
+    if (area_credits_rows.length > 0) {
+        return {
+            requiredCredits: area_credits_rows.reduce((sum, group) => sum + (group.credits as number), 0),
+            sourceGroups: area_credits_rows
+        }
+    }
+
+    return null
+}
+
+// Mirrors Tim's _get_selected_option_name: first non-empty option_name
+// among applicable groups matching the selected option_id.
+function getSelectedAreaOfConcentrationOptionName(
+    applicable_groups: SpecializationRequirementGroup[],
+    option_id: string
+): string {
+    if (!option_id) {
+        return ''
+    }
+
+    const normalized_option_id = option_id.trim().toUpperCase()
+
+    for (const group of applicable_groups) {
+        const group_option_id = (group.option_id ?? '').trim().toUpperCase()
+
+        if (group_option_id !== normalized_option_id) {
+            continue
+        }
+
+        const option_name = (group.option_name ?? '').trim()
+
+        if (option_name !== '') {
+            return option_name
+        }
+    }
+
+    return ''
+}
+
+function matchAreaOfConcentrationCourses(
+    counted_course_plan: CourseAttempt[],
+    eligible_course_codes: string[],
+    resolver: SpecializationRequirementResolver
+): { course_code: string; credits: number }[] {
+    const seen = new Set<string>()
+    const matched: { course_code: string; credits: number }[] = []
+
+    for (const attempt of counted_course_plan) {
+        if (seen.has(attempt.course_code)) {
+            continue
+        }
+
+        if (resolver.courseMatchesAnyEligible(attempt.course_code, eligible_course_codes)) {
+            seen.add(attempt.course_code)
+            matched.push({ course_code: attempt.course_code, credits: attempt.credits })
+        }
+    }
+
+    return matched
+}
+
+// Mirrors Tim's _make_synthetic_group for the canonical Area of
+// Concentration row. Program/calendar_year/program_type are taken from a
+// representative source group (the first resolved source row), which is
+// equivalent to using the student profile directly since source rows are
+// already filtered to match the profile.
+function makeCanonicalAreaOfConcentrationGroup(
+    representative_group: SpecializationRequirementGroup,
+    suffix: string,
+    option_id: string | null,
+    option_name: string | null
+): SpecializationRequirementGroup {
+    const program = representative_group.program.trim().toUpperCase()
+    const calendar_year = representative_group.calendar_year.trim()
+    const program_type = representative_group.program_type.trim().toUpperCase()
+
+    const group_id = `${program}_${calendar_year}_${program_type}_${suffix}`
+        .replaceAll('-', '_')
+        .replaceAll(' ', '_')
+        .toUpperCase()
+
+    return {
+        group_id,
+        program,
+        calendar_year,
+        program_type,
+        year_level: null,
+        requirement_area: 'Area of Concentration',
+        option_id,
+        option_name,
+        option_name_raw: null,
+        theme: null,
+        is_recommended: false,
+        label: 'Area of Concentration total credits',
+        credits: null,
+        rule_type: 'option_total_credits',
+        rule_value: null,
+        rule_subject: null,
+        include_pattern: null,
+        exclude_pattern: null,
+        rule_unit: 'credits',
+        source_text: '',
+        unit: 'credits'
+    }
+}
+
+interface AuditCanonicalAreaOfConcentrationProps {
+    applicable_groups: SpecializationRequirementGroup[]
+    resolver: SpecializationRequirementResolver
+    counted_course_plan: CourseAttempt[]
+    student_profile: StudentSetupProfile
+}
+
+// Handler for the canonical Area of Concentration requirement. Mirrors
+// Tim's _audit_canonical_aoc_minimum: raw AoC metadata rows
+// (option_minimum_credits, area_of_concentration_credits) are resolved into
+// a single required-credit target via
+// resolveCanonicalAreaOfConcentrationCreditRequirement's precedence, then
+// matched against the student's selected option's full eligible-course
+// universe. That universe intentionally includes recommended-course rows
+// (see getOptionEligibleCourseCodes), even though recommended groups are
+// themselves excluded from the visible/audited requirement-group list.
+function auditCanonicalAreaOfConcentration({
+    applicable_groups,
+    resolver,
+    counted_course_plan,
+    student_profile
+}: AuditCanonicalAreaOfConcentrationProps): SpecializationAuditRow | null {
+    const resolved = resolveCanonicalAreaOfConcentrationCreditRequirement(applicable_groups, student_profile)
+
+    if (resolved === null) {
+        return null
+    }
+
+    const option_id = (student_profile.option_id ?? '').trim()
+    const representative_group = resolved.sourceGroups[0]
+
+    if (!option_id) {
+        const synthetic_group = makeCanonicalAreaOfConcentrationGroup(
+            representative_group,
+            'AOC_NO_OPTION_CANONICAL_TOTAL_CREDITS',
+            null,
+            null
+        )
+
+        return createSpecializationAuditRow({
+            group: synthetic_group,
+            rule_type: 'option_total_credits',
+            completed: 0,
+            required: resolved.requiredCredits,
+            unit: 'credits',
+            matched_courses: [],
+            notes: ''
+        })
+    }
+
+    if (resolved.requiredCredits <= 0) {
+        return null
+    }
+
+    const option_name = getSelectedAreaOfConcentrationOptionName(applicable_groups, option_id)
+    const eligible_course_codes = resolver.getOptionEligibleCourseCodes(option_id)
+
+    const matched = matchAreaOfConcentrationCourses(counted_course_plan, eligible_course_codes, resolver)
+    const matched_courses = matched.map((course) => course.course_code)
+    const completed = matched.reduce((sum, course) => sum + course.credits, 0)
+
+    const synthetic_group = makeCanonicalAreaOfConcentrationGroup(
+        representative_group,
+        `AOC_${option_id}_CANONICAL_TOTAL_CREDITS`,
+        option_id,
+        option_name || null
+    )
+
+    return createSpecializationAuditRow({
+        group: synthetic_group,
+        rule_type: 'option_total_credits',
+        completed,
+        required: resolved.requiredCredits,
+        unit: 'credits',
+        matched_courses,
+        notes: ''
+    })
 }
 
 function getRequiredTarget(
