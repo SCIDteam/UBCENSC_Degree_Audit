@@ -15,12 +15,7 @@ import { SpecializationRequirementResolver } from './specializationRequirementRe
 type SpecializationAuditStatus = AuditRequirementStatus | 'review'
 
 // Internal pre-allocation specialization audit row.
-//
-// This is distinct from the public SpecializationRequirementResult contract
-// (types/audit.ts), which represents Tim's final, post-allocation result and
-// uses allocated_courses (exclusive assignments). Rows here represent
-// possible matches only, prior to the AllocationEngine's exclusive
-// assignment pass.
+
 export interface SpecializationAuditRow {
     group_id: string
     requirement_area: string
@@ -176,7 +171,6 @@ export function SpecializationAuditor({
 
 // Matches Tim's specialization_auditor.py _filter_counted_courses, and the
 // unexported filterCountedCourses in runAudit.ts. Duplicated locally here
-// per this task's constraint of not modifying runAudit.ts.
 function filterCountedCourses(
     student_course_plan: CourseAttempt[]
 ): CourseAttempt[] {
