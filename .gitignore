@@ -2,3 +2,4 @@ student_inputs/transcripts/*
 __pycache__/
 output/
 audit_outputs/
+*.xlsx
