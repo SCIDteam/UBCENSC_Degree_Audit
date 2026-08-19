@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from audit import course_classification_core as classification_core
 
-INPUT_FILENAME = "Course-Data-2026-07-22 Summer.xlsx"
+INPUT_FILENAME = "Course-Data_2024-2027.xlsx"
 
 FACULTY_REQUIREMENTS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -125,7 +125,7 @@ REQUISITE_HEADINGS = (
 )
 
 
-def load_excel_file() -> pd.DataFrame | None:
+def load_excel_file(skiprows=15) -> pd.DataFrame | None:
     base_dir = os.path.abspath(os.path.dirname(__file__))
 
     input_path = os.path.join(
@@ -137,7 +137,7 @@ def load_excel_file() -> pd.DataFrame | None:
     try:
         dataframe = pd.read_excel(
             input_path,
-            skiprows=15,
+            skiprows=skiprows,
         )
 
         print(f"File successfully loaded: {input_path}")
@@ -662,7 +662,7 @@ def write_catalogue(
 
 
 if __name__ == "__main__":
-    dataframe = load_excel_file()
+    dataframe = load_excel_file(skiprows=0)
 
     if dataframe is None:
         raise SystemExit(1)
