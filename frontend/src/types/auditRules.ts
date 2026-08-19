@@ -18,7 +18,7 @@ export type Metric = (
     'one_course_from_list' |
     'one_lab_course'
 )
-export type ApplicableProgram = "All" | "Major" | "Honours"
+export type ApplicableProgram = "All" | "Major" | "Honours" | "MajorOrHonours"
 
 export type BaseRule = {
     metric: Metric

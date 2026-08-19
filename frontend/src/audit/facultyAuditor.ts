@@ -38,11 +38,17 @@ export function FacultyAuditor({
 }: FacultyAuditorProps) {
     const facult_requirement_results: FacultyRequirementResult[] = []
 
+    const studentProgram = student_profile.program_type;
+
     const facultyRequirementLookup = Object.fromEntries(
-        faculty_requirements.map(req => [
-            req.metric,
-            req,
-        ])
+        faculty_requirements
+            .filter(
+            (req) =>
+                req.applicable_program === 'All' ||
+                req.applicable_program === 'MajorOrHonours' ||
+                req.applicable_program === studentProgram
+            )
+            .map((req) => [req.metric, req])
     );
 
     // Total Faculty Credits
