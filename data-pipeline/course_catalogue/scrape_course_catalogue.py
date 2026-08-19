@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from audit import course_classification_core as classification_core
 
 INPUT_FILENAME = "Course-Data_2024-2027.xlsx"
+OUTPUT_FILENAME = "course-catalogue.json"
 
 FACULTY_REQUIREMENTS_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -640,7 +641,7 @@ def write_catalogue(
 
     output_path = os.path.join(
         base_dir,
-        "course-catalogue.json",
+        OUTPUT_FILENAME,
     )
 
     with open(
