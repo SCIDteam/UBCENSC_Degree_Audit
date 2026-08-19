@@ -195,15 +195,33 @@ if __name__ == "__main__":
             )
         )
 
+        specReqGroups_df = requirements["requirement_groups"]
+        specReqGroups_df['label'] = (
+            specReqGroups_df['label']
+            .str.replace(
+                r'(?<![_V,\bor\b]) \d*$', 
+                '', 
+                regex=True
+            )
+        )
         rules["specializationRequirementGroups"].extend(
             create_structured_records(
-                requirements["requirement_groups"]
+                specReqGroups_df
             )
         )
 
+        specReqCourses_df = requirements["requirement_courses"]
+        specReqCourses_df['label'] = (
+            specReqCourses_df['label']
+            .str.replace(
+                r'(?<![_V,\bor\b]) \d*$', 
+                '', 
+                regex=True
+            )
+        )
         rules["specializationRequirementCourses"].extend(
             create_structured_records(
-                requirements["requirement_courses"]
+                specReqCourses_df
             )
         )
 
