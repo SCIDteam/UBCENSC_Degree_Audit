@@ -26,7 +26,8 @@ def write_json_to(result, output_path):
     )
 
     with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(result, file, indent=4)        
+        json.dump(result, file, indent=4)       
+         
 def create_structured_records(df: pd.DataFrame):
     """
     Preserve the full CSV structure for frontend specialization
@@ -173,52 +174,52 @@ if __name__ == "__main__":
     course_requirements_dir = "./course_requirements"
 
     rules["courseRequirements"] = []
-rules["specializationRequirementGroups"] = []
-rules["specializationRequirementCourses"] = []
-rules["allocationConfigs"] = {}
+    rules["specializationRequirementGroups"] = []
+    rules["specializationRequirementCourses"] = []
+    rules["allocationConfigs"] = {}
 
-for program_year in [
-    "ensc_2024_2025",
-    "ensc_2026_2027",
-]:
-    dir_name = os.path.join(
-        course_requirements_dir,
-        program_year,
-    )
-
-    requirements = read_data(dir_name)
-
-    rules["courseRequirements"].extend(
-        create_course_requirements(
-            requirements["requirement_groups"]
-        )
-    )
-
-    rules["specializationRequirementGroups"].extend(
-        create_structured_records(
-            requirements["requirement_groups"]
-        )
-    )
-
-    rules["specializationRequirementCourses"].extend(
-        create_structured_records(
-            requirements["requirement_courses"]
-        )
-    )
-
-    if "allocation_config" in requirements:
-        calendar_year = program_year.replace(
-            "ensc_",
-            ""
-        ).replace(
-            "_",
-            "-"
+    for program_year in [
+        "ensc_2024_2025",
+        "ensc_2026_2027",
+    ]:
+        dir_name = os.path.join(
+            course_requirements_dir,
+            program_year,
         )
 
-        rules["allocationConfigs"][calendar_year] = (
-            create_structured_records(
-                requirements["allocation_config"]
+        requirements = read_data(dir_name)
+
+        rules["courseRequirements"].extend(
+            create_course_requirements(
+                requirements["requirement_groups"]
             )
         )
 
-write_json_to(rules, output_path)
+        rules["specializationRequirementGroups"].extend(
+            create_structured_records(
+                requirements["requirement_groups"]
+            )
+        )
+
+        rules["specializationRequirementCourses"].extend(
+            create_structured_records(
+                requirements["requirement_courses"]
+            )
+        )
+
+        if "allocation_config" in requirements:
+            calendar_year = program_year.replace(
+                "ensc_",
+                ""
+            ).replace(
+                "_",
+                "-"
+            )
+
+            rules["allocationConfigs"][calendar_year] = (
+                create_structured_records(
+                    requirements["allocation_config"]
+                )
+            )
+
+    write_json_to(rules, output_path)
