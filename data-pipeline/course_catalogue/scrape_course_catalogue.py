@@ -640,7 +640,7 @@ def write_catalogue(
 
     output_path = os.path.join(
         base_dir,
-        "course_catalogue.json",
+        "course-catalogue.json",
     )
 
     with open(
