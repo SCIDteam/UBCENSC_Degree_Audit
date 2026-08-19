@@ -205,7 +205,7 @@ export function FacultyAuditor({
         createFacultyRequirementResult({
             requirement_id: "LAB_REQUIREMENT",
             requirement_area: "Faculty Requirement",
-            label: "Faculty Communication Credits",
+            label: "Lab Science Credits",
             completed: num_lab_courses,
             required: min_lab_courses_required,
             unit: "course",
