@@ -118,6 +118,19 @@ export function RunAudit({
     const counted_credits = filtered_course_plan
         .reduce((accm, cur) => accm + cur.credits, 0)
 
+    // Calculate other faculty credit capacity
+    const counted_other_fac = filtered_course_plan
+        .filter(course => !course.is_arts_credit && !course.is_science_credit)
+        .reduce((total, course) => total + course.credits, 0);
+    const other_fac_cap =
+        facultyRequirements.find(
+            req => req.id === 'OTHER_FACULTY_CREDITS_CAP'
+        )?.value ?? 0;
+    const remaining_other_faculty_capacity = Math.max(
+        0,
+        other_fac_cap - counted_other_fac
+    );
+
     const case_summary: AuditCaseSummary = {
         case_id: case_id,
 
@@ -137,7 +150,7 @@ export function RunAudit({
             message: promotion_message
         },
         free_elective_credits: 0,
-        remaining_other_faculty_capacity: 0
+        remaining_other_faculty_capacity: remaining_other_faculty_capacity
     }
 
     // Create audit result instance
