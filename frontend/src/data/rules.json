@@ -41,7 +41,7 @@
             "notes": "300/400-level Science credits"
         },
         {
-            "id": "UPPER_LEVEL_SCIENCE_HONOURS",
+            "id": "UPPER_LEVEL_SCIENCE",
             "metric": "min_upper_level_science_credits",
             "applicable_program": "Honours",
             "value": 42,
