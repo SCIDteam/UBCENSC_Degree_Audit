@@ -207,6 +207,8 @@ export default function PlannerScreen({
   onRunAudit,
   auditError,
   onDismissAuditError,
+  includePlannedCourses,
+  onIncludePlannedCoursesChange,
 }: {
   profile: StudentSetupProfile
   attempts: CourseAttempt[]
@@ -217,6 +219,8 @@ export default function PlannerScreen({
   onRunAudit: () => void
   auditError: string | null
   onDismissAuditError: () => void
+  includePlannedCourses: boolean
+  onIncludePlannedCoursesChange: (value: boolean) => void
 }) {
   const [expanded, setExpanded] = useState<Set<PlannerYear>>(new Set([1]))
   const [editingAttempt, setEditingAttempt] = useState<CourseAttempt | null>(null)
@@ -361,6 +365,15 @@ export default function PlannerScreen({
             >
               Back
             </button>
+            <label className="flex items-center gap-1.5 whitespace-nowrap px-1 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={includePlannedCourses}
+                onChange={(event) => onIncludePlannedCoursesChange(event.target.checked)}
+                className="h-3.5 w-3.5 rounded border-border accent-primary"
+              />
+              Include planned courses
+            </label>
             <button
               type="button"
               onClick={onRunAudit}

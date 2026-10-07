@@ -40,6 +40,7 @@ interface SpecializationAuditorProps {
     specialization_requirement_courses: SpecializationRequirementCourse[]
     student_course_plan: CourseAttempt[]
     student_profile: StudentSetupProfile
+    include_planned_courses: boolean
 }
 
 // Rule types audited by this slice. All other rule types are skipped
@@ -57,9 +58,10 @@ export function SpecializationAuditor({
     specialization_requirement_groups,
     specialization_requirement_courses,
     student_course_plan,
-    student_profile
+    student_profile,
+    include_planned_courses
 }: SpecializationAuditorProps): SpecializationAuditRow[] {
-    const counted_course_plan = filterCountedCourses(student_course_plan)
+    const counted_course_plan = filterCountedCourses(student_course_plan, include_planned_courses)
 
     const resolver = new SpecializationRequirementResolver({
         requirementGroups: specialization_requirement_groups,
@@ -172,11 +174,12 @@ export function SpecializationAuditor({
 // Matches Tim's specialization_auditor.py _filter_counted_courses, and the
 // unexported filterCountedCourses in runAudit.ts. Duplicated locally here
 function filterCountedCourses(
-    student_course_plan: CourseAttempt[]
+    student_course_plan: CourseAttempt[],
+    include_planned_courses: boolean
 ): CourseAttempt[] {
     return student_course_plan.filter(
         (attempt) =>
-            attempt.status === 'planned' ||
+            (include_planned_courses && attempt.status === 'planned') ||
             attempt.status === 'in_progress' ||
             (attempt.status === 'completed' && attempt.grade === 'P')
     )

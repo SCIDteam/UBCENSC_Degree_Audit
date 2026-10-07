@@ -365,6 +365,7 @@ const result = RunAudit({
   classified_courses: classifiedCourses,
   student_course_plan: studentCoursePlan,
   student_profile: studentProfile,
+  include_planned_courses: true,
 });
 
 console.log(JSON.stringify(result));

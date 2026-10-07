@@ -21,12 +21,14 @@ interface RunAuditProps {
     classified_courses: CatalogueCourse[]
     student_course_plan: CourseAttempt[]
     student_profile: StudentSetupProfile
+    include_planned_courses: boolean
 }
 
 export function RunAudit({
     classified_courses,
     student_course_plan,
-    student_profile
+    student_profile,
+    include_planned_courses
 }: RunAuditProps) {
     const {
         facultyRequirements,
@@ -39,7 +41,7 @@ export function RunAudit({
     } = LoadRules();
 
     // Filter for counted courses
-    const filtered_course_plan = filterCountedCourses(student_course_plan);
+    const filtered_course_plan = filterCountedCourses(student_course_plan, include_planned_courses);
 
     // Faculty Audit
     const faculty_requirements = (
@@ -89,7 +91,8 @@ export function RunAudit({
         specialization_requirement_groups: specializationRequirementGroups,
         specialization_requirement_courses: specializationRequirementCourses,
         student_course_plan: student_course_plan,
-        student_profile: student_profile
+        student_profile: student_profile,
+        include_planned_courses: include_planned_courses
     });
 
     // Course allocation, using the FULL student course plan so that failed,
@@ -98,7 +101,8 @@ export function RunAudit({
         student_course_plan,
         specializationAudit,
         allocationConfigs,
-        specialization_resolver
+        specialization_resolver,
+        include_planned_courses
     );
 
     const course_allocations = toCourseAllocationResults(allocation_rows);
@@ -141,7 +145,9 @@ export function RunAudit({
         academic_year: student_profile.academic_year,
 
         audit_mode: 'planned',
-        counted_statuses: ['completed'],
+        counted_statuses: include_planned_courses
+            ? ['completed', 'in_progress', 'planned']
+            : ['completed', 'in_progress'],
 
         counted_credits: counted_credits,
         faculty: faculty_count_summary,
@@ -166,12 +172,13 @@ export function RunAudit({
     return audit_results;
 }
 
-function filterCountedCourses(
-    student_course_plan: CourseAttempt[]
+export function filterCountedCourses(
+    student_course_plan: CourseAttempt[],
+    include_planned_courses: boolean
 ): CourseAttempt[] {
     return student_course_plan.filter(
         (attempt) =>
-            attempt.status === 'planned' ||
+            (include_planned_courses && attempt.status === 'planned') ||
             attempt.status === 'in_progress' ||
             (attempt.status === 'completed' && attempt.grade === 'P')
     )

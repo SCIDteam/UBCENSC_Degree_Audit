@@ -46,9 +46,9 @@ const NOT_COUNTED_ALLOCATION_NOTES =
     'Course excluded because status, letter grade, or percentage grade is not countable.'
 
 
-function isCountedAttempt(attempt: CourseAttempt): boolean {
+function isCountedAttempt(attempt: CourseAttempt, include_planned_courses: boolean): boolean {
     return (
-        attempt.status === 'planned' ||
+        (include_planned_courses && attempt.status === 'planned') ||
         attempt.status === 'in_progress' ||
         (attempt.status === 'completed' && attempt.grade === 'P')
     )
@@ -89,10 +89,11 @@ function computeSortableTermKey(attempt: CourseAttempt): number {
 // transformation; no further course-plan changes are expected during the
 // allocation process, so the working rows are a static snapshot of the plan.
 export function prepareAllocationRows(
-    student_course_plan: CourseAttempt[]
+    student_course_plan: CourseAttempt[],
+    include_planned_courses: boolean
 ): AllocationWorkingRow[] {
     return student_course_plan.map((attempt, index) => {
-        const counted = isCountedAttempt(attempt)
+        const counted = isCountedAttempt(attempt, include_planned_courses)
 
         return {
             attempt,
@@ -613,9 +614,10 @@ export function allocateCourses(
     student_course_plan: CourseAttempt[],
     specializationAudit: SpecializationAuditRow[],
     allocationConfigs: AllocationConfigs,
-    resolver: SpecializationRequirementResolver
+    resolver: SpecializationRequirementResolver,
+    include_planned_courses: boolean
 ): AllocationWorkingRow[] {
-    const rows = prepareAllocationRows(student_course_plan)
+    const rows = prepareAllocationRows(student_course_plan, include_planned_courses)
     const passes = buildAllocationPasses(allocationConfigs, resolver, specializationAudit)
 
     for (const pass of passes) {
@@ -705,9 +707,10 @@ export function runAllocation(
     student_course_plan: CourseAttempt[],
     specializationAudit: SpecializationAuditRow[],
     allocationConfigs: AllocationConfigs,
-    resolver: SpecializationRequirementResolver
+    resolver: SpecializationRequirementResolver,
+    include_planned_courses: boolean
 ): CourseAllocationResult[] {
     return toCourseAllocationResults(
-        allocateCourses(student_course_plan, specializationAudit, allocationConfigs, resolver)
+        allocateCourses(student_course_plan, specializationAudit, allocationConfigs, resolver, include_planned_courses)
     )
 }

@@ -22,6 +22,8 @@ function App() {
   const [auditInput, setAuditInput] = useState<AuditInput | null>(null)
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null)
   const [auditError, setAuditError] = useState<string | null>(null)
+  // Preserves prior behavior, which always counted planned courses.
+  const [includePlannedCourses, setIncludePlannedCourses] = useState(true)
   const initializedPlanKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -77,6 +79,7 @@ function App() {
           classified_courses: attempts,
           student_course_plan: attempts,
           student_profile: profile,
+          include_planned_courses: includePlannedCourses,
         })
         : exampleAuditResult
 
@@ -120,6 +123,8 @@ function App() {
         onRunAudit={runAudit}
         auditError={auditError}
         onDismissAuditError={() => setAuditError(null)}
+        includePlannedCourses={includePlannedCourses}
+        onIncludePlannedCoursesChange={setIncludePlannedCourses}
       />
     )
   }
