@@ -1,47 +1,66 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import SetupScreen from './screens/SetupScreen'
 import PlannerScreen from './screens/PlannerScreen'
 import AuditScreen from './screens/AuditScreen'
-import type { StudentSetupProfile } from './types/studentProfile'
+import { emptyStudentSetupProfile, type StudentSetupProfile } from './types/studentProfile'
 import type { CourseAttempt } from './types/coursePlan'
 import type { AuditInput, AuditResult } from './types/audit'
-import { buildRecommendedAttempts } from './utils/recommendedPlan'
+import { buildRecommendedAttempts, getRecommendedPlanKey } from './utils/recommendedPlan'
 import { buildAuditInput } from './utils/auditInputAdapter'
+import { loadCourseCatalogue } from './utils/courseCatalogueLoader'
+import {
+  applyCatalogueToAttempts,
+  clearSavedSession,
+  loadSavedSession,
+  saveSession,
+  type SavedScreen,
+} from './utils/savedSession'
 import { RunAudit as runAuditEngine } from './audit/runAudit'
 // Temporary fixture standing in for the real browser audit calculator,
 // which will replace this once AuditInput -> AuditResult is implemented.
 import { exampleAuditResult } from './utils/exampleAuditResult'
 
 const USE_DEVELOPMENT_AUDIT_ENGINE = true
-type AppScreen = 'setup' | 'planner' | 'audit'
+type AppScreen = SavedScreen
 
 function App() {
-  const [screen, setScreen] = useState<AppScreen>('setup')
-  const [profile, setProfile] = useState<StudentSetupProfile | null>(null)
-  const [attempts, setAttempts] = useState<CourseAttempt[]>([])
+  // Inputs saved in this browser by an earlier visit, read once on first render.
+  const [savedSession] = useState(loadSavedSession)
+  // The audit result itself isn't saved, so a reload on the audit screen
+  // returns to the planner, where Run Audit recreates it.
+  const [screen, setScreen] = useState<AppScreen>(
+    savedSession?.screen === 'audit' ? 'planner' : (savedSession?.screen ?? 'setup'),
+  )
+  const [setupDraft, setSetupDraft] = useState<StudentSetupProfile>(
+    savedSession?.setup_draft ?? emptyStudentSetupProfile,
+  )
+  const [profile, setProfile] = useState<StudentSetupProfile | null>(savedSession?.profile ?? null)
+  const [attempts, setAttempts] = useState<CourseAttempt[]>(savedSession?.attempts ?? [])
   const [auditInput, setAuditInput] = useState<AuditInput | null>(null)
   const [auditResult, setAuditResult] = useState<AuditResult | null>(null)
   const [auditError, setAuditError] = useState<string | null>(null)
   // Preserves prior behavior, which always counted planned courses.
-  const [includePlannedCourses, setIncludePlannedCourses] = useState(true)
-  const initializedPlanKeyRef = useRef<string | null>(null)
+  const [includePlannedCourses, setIncludePlannedCourses] = useState(
+    savedSession?.include_planned_courses ?? true,
+  )
+  // Recommended plan that `attempts` started from. Submitting Setup with the
+  // same choices keeps the student's edits instead of reloading the plan.
+  const [planKey, setPlanKey] = useState<string | null>(savedSession?.plan_key ?? null)
+
+  const hasInputs =
+    Object.values(setupDraft).some(Boolean) || profile !== null || attempts.length > 0
 
   useEffect(() => {
     if (!profile) return
-    const { calendar_year, program_type, option_id, academic_year } = profile
-    if (!calendar_year || !program_type || !option_id || typeof academic_year !== 'number') {
-      return
-    }
-
-    const planKey = `${calendar_year}|${program_type}|${option_id}`
-    if (initializedPlanKeyRef.current === planKey) return
-    initializedPlanKeyRef.current = planKey
+    const nextPlanKey = getRecommendedPlanKey(profile)
+    if (!nextPlanKey || nextPlanKey === planKey) return
 
     let cancelled = false
     buildRecommendedAttempts(profile)
       .then((recommendedAttempts) => {
         if (cancelled) return
         setAttempts(recommendedAttempts)
+        setPlanKey(nextPlanKey)
       })
       .catch((error) => {
         console.error('[App] Failed to load recommended course plan', error)
@@ -50,7 +69,53 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [profile])
+  }, [profile, planKey])
+
+  // Bring saved courses up to date with the current catalogue.
+  useEffect(() => {
+    if (!savedSession?.attempts.length) return
+
+    let cancelled = false
+    loadCourseCatalogue()
+      .then((catalogue) => {
+        if (cancelled) return
+        setAttempts((prev) => applyCatalogueToAttempts(prev, catalogue))
+      })
+      .catch((error) => {
+        console.error('[App] Failed to refresh saved courses from the catalogue', error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [savedSession])
+
+  useEffect(() => {
+    if (!hasInputs) {
+      clearSavedSession()
+      return
+    }
+    saveSession({
+      screen,
+      setup_draft: setupDraft,
+      profile,
+      plan_key: planKey,
+      attempts,
+      include_planned_courses: includePlannedCourses,
+    })
+  }, [hasInputs, screen, setupDraft, profile, planKey, attempts, includePlannedCourses])
+
+  const resetInputs = () => {
+    setSetupDraft(emptyStudentSetupProfile)
+    setProfile(null)
+    setAttempts([])
+    setPlanKey(null)
+    setIncludePlannedCourses(true)
+    setAuditInput(null)
+    setAuditResult(null)
+    setAuditError(null)
+    setScreen('setup')
+  }
 
   const addAttempt = (attempt: CourseAttempt) => {
     setAttempts((prev) => [...prev, attempt])
@@ -131,7 +196,11 @@ function App() {
 
   return (
     <SetupScreen
-      initialProfile={profile ?? undefined}
+      profile={setupDraft}
+      onProfileChange={setSetupDraft}
+      savedPlanKey={planKey}
+      canReset={hasInputs}
+      onReset={resetInputs}
       onComplete={(completedProfile) => {
         setProfile(completedProfile)
         setScreen('planner')

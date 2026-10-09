@@ -85,6 +85,17 @@ function mapFirstTermOffered(terms: PlannerTermLabel[] | undefined): PlannerTerm
   return 'winter_1'
 }
 
+// Identifies which recommended plan applies to a profile, or null while the
+// profile is incomplete. Academic year is left out, so changing it keeps the
+// student's current plan.
+export function getRecommendedPlanKey(profile: StudentSetupProfile): string | null {
+  const { calendar_year, program_type, option_id, academic_year } = profile
+  if (!calendar_year || !program_type || !option_id || typeof academic_year !== 'number') {
+    return null
+  }
+  return `${calendar_year}|${program_type}|${option_id}`
+}
+
 export async function buildRecommendedAttempts(
   profile: StudentSetupProfile,
 ): Promise<CourseAttempt[]> {

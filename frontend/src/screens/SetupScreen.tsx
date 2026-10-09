@@ -5,6 +5,7 @@ import {
   Check,
   ChevronDown,
   Info,
+  RotateCcw,
   Search,
   X,
 } from 'lucide-react'
@@ -15,7 +16,8 @@ import {
   programTypes,
   programs,
 } from '../utils/setupOptions'
-import { emptyStudentSetupProfile, type StudentSetupProfile } from '../types/studentProfile'
+import { getRecommendedPlanKey } from '../utils/recommendedPlan'
+import type { StudentSetupProfile } from '../types/studentProfile'
 
 interface Option {
   value: string
@@ -312,22 +314,30 @@ function isProfileComplete(profile: StudentSetupProfile) {
 }
 
 export default function SetupScreen({
-  initialProfile,
+  profile,
+  onProfileChange,
+  savedPlanKey,
+  canReset,
+  onReset,
   onComplete,
 }: {
-  initialProfile?: StudentSetupProfile
+  profile: StudentSetupProfile
+  onProfileChange: (profile: StudentSetupProfile) => void
+  // Recommended plan the saved course plan started from, if there is one.
+  savedPlanKey: string | null
+  canReset: boolean
+  onReset: () => void
   onComplete?: (profile: StudentSetupProfile) => void
 }) {
-  const [profile, setProfile] = useState<StudentSetupProfile>(
-    initialProfile ?? emptyStudentSetupProfile,
-  )
   const [touched, setTouched] = useState({
     calendar_year: false,
     option_id: false,
   })
+  const [confirmingReset, setConfirmingReset] = useState(false)
+  const resetButtonRef = useRef<HTMLButtonElement>(null)
 
   const set = <K extends keyof StudentSetupProfile>(key: K, value: StudentSetupProfile[K]) =>
-    setProfile((prev) => ({ ...prev, [key]: value }))
+    onProfileChange({ ...profile, [key]: value })
 
   const concentrationOptions = getConcentrationOptions(profile.calendar_year)
 
@@ -336,13 +346,24 @@ export default function SetupScreen({
     const validOptionIds: string[] = nextCalendarYear
       ? concentrationsByCalendarYear[nextCalendarYear].map((concentration) => concentration.optionId)
       : []
-    setProfile((prev) => ({
-      ...prev,
+    onProfileChange({
+      ...profile,
       calendar_year: nextCalendarYear,
-      option_id: validOptionIds.includes(prev.option_id) ? prev.option_id : '',
-    }))
+      option_id: validOptionIds.includes(profile.option_id) ? profile.option_id : '',
+    })
     setTouched((prev) => ({ ...prev, calendar_year: true }))
   }
+
+  const handleConfirmReset = () => {
+    setConfirmingReset(false)
+    setTouched({ calendar_year: false, option_id: false })
+    onReset()
+    document.getElementById('calendar-year')?.focus()
+  }
+
+  const planKey = getRecommendedPlanKey(profile)
+  const continuesSavedPlan = savedPlanKey !== null && planKey === savedPlanKey
+  const replacesSavedPlan = savedPlanKey !== null && planKey !== null && planKey !== savedPlanKey
 
   const complete = isProfileComplete(profile)
   const completedCount = [
@@ -469,6 +490,13 @@ export default function SetupScreen({
                 </span>
               </div>
 
+              {replacesSavedPlan && (
+                <p className="flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <AlertCircle size={12} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+                  These choices load a new recommended plan, which replaces your saved course plan.
+                </p>
+              )}
+
               <div className="flex flex-col items-center gap-3 pt-1 sm:flex-row">
                 <button
                   type="button"
@@ -484,9 +512,61 @@ export default function SetupScreen({
                       : 'cursor-not-allowed bg-muted text-muted-foreground',
                   ].join(' ')}
                 >
-                  Create My Course Plan
+                  {continuesSavedPlan ? 'Continue to My Course Plan' : 'Create My Course Plan'}
                 </button>
+                {canReset && (
+                  <button
+                    ref={resetButtonRef}
+                    type="button"
+                    onClick={() => setConfirmingReset(true)}
+                    aria-expanded={confirmingReset}
+                    aria-controls="reset-confirmation"
+                    className="flex w-full items-center justify-center gap-2 rounded-md border border-border bg-card px-5 py-3 font-heading text-sm font-semibold text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:w-auto"
+                  >
+                    <RotateCcw size={14} aria-hidden="true" />
+                    Reset
+                  </button>
+                )}
               </div>
+
+              {canReset && confirmingReset && (
+                <div
+                  id="reset-confirmation"
+                  role="group"
+                  aria-labelledby="reset-confirmation-text"
+                  className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3"
+                >
+                  <p id="reset-confirmation-text" className="text-sm text-foreground">
+                    Clear your profile and course plan from this browser? This can't be undone.
+                  </p>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={handleConfirmReset}
+                      className="rounded-md bg-destructive px-3.5 py-2 font-heading text-sm font-semibold text-white transition-colors hover:bg-destructive/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
+                    >
+                      Clear everything
+                    </button>
+                    <button
+                      type="button"
+                      autoFocus
+                      onClick={() => {
+                        setConfirmingReset(false)
+                        resetButtonRef.current?.focus()
+                      }}
+                      className="rounded-md border border-border bg-card px-3.5 py-2 font-heading text-sm font-medium text-foreground transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {canReset && !confirmingReset && (
+                <p className="text-center text-xs text-muted-foreground sm:text-left">
+                  Your inputs are saved in this browser. Reset clears them.
+                </p>
+              )}
             </div>
           </div>
 

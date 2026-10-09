@@ -6,7 +6,7 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string')
 }
 
-function isCatalogueCourse(value: unknown): value is CatalogueCourse {
+export function isCatalogueCourse(value: unknown): value is CatalogueCourse {
   if (!value || typeof value !== 'object') return false
   const course = value as Record<string, unknown>
   return (
