@@ -492,6 +492,15 @@
             "notes": "Communication Requirement"
         }
     ],
+    "breadthCategories": [
+        "Mathematics",
+        "Chemistry",
+        "Physics",
+        "Life Science",
+        "Statistics",
+        "Computer Science",
+        "Earth and Planetary Science"
+    ],
     "courseRequirements": [
         {
             "id": "ENSC_2024_2025_MAJOR_001",

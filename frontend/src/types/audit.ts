@@ -96,6 +96,16 @@ export interface AuditCaseSummary {
   remaining_other_faculty_capacity: number
 }
 
+// Credits counted toward one category of a categories-unit requirement
+// (e.g. a Science Breadth category). A category is completed once credits
+// reaches required_credits.
+export interface CategoryProgress {
+  category: string
+  credits: number
+  required_credits: number
+  completed: boolean
+}
+
 export interface FacultyRequirementResult {
   requirement_id: string
   requirement_area: string
@@ -108,6 +118,7 @@ export interface FacultyRequirementResult {
   unit: AuditProgressUnit
   matched_courses: string[]
   notes?: string
+  category_progress?: CategoryProgress[]
 }
 
 // Represents Tim's final, post-allocation specialization result only.

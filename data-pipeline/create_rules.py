@@ -98,6 +98,16 @@ def create_promotion_rules(promotion_rules: pd.DataFrame):
         .to_dict(orient='records')
     )
 
+def create_breadth_categories(breadth_categories: pd.DataFrame):
+    # Distinct Science Breadth category names in CSV order, so the frontend
+    # can report which categories are still missing.
+    return (
+        breadth_categories['breadth_category']
+        .str.strip()
+        .drop_duplicates()
+        .tolist()
+    )
+
 def create_course_requirements(course_requirements: pd.DataFrame):
     course_requirements['unit'] = 'credits'
     # For rule types where the rule value relates to credits
@@ -168,6 +178,9 @@ if __name__ == "__main__":
     )
     rules["promotionRules"] = create_promotion_rules(
         requirements["promotion_rules"]
+    )
+    rules["breadthCategories"] = create_breadth_categories(
+        requirements["faculty_breadth_categories"]
     )
 
     # Course / Specialization Requirements

@@ -8,13 +8,18 @@ import type {
 import type {
     FacultyRequirementResult,
     AuditProgressUnit,
-    AuditRequirementStatus
+    AuditRequirementStatus,
+    CategoryProgress
 } from '../types/audit'
+
+// A Science Breadth category counts as completed once it has this many credits.
+const MIN_BREADTH_CATEGORY_CREDITS = 3;
 
 interface FacultyAuditorProps {
     classified_courses: CatalogueCourse[]
     faculty_requirements: FacultyRequirements[]
     course_requirements: CourseRequirements[]
+    breadth_categories: string[]
     student_course_plan: CourseAttempt[]
     student_profile: StudentSetupProfile
 }
@@ -28,11 +33,13 @@ interface RecordFacultyRequirementProps {
     unit: AuditProgressUnit
     matched_courses: string[]
     notes?: string
+    category_progress?: CategoryProgress[]
 }
 
 export function FacultyAuditor({
     faculty_requirements,
     course_requirements,
+    breadth_categories,
     student_course_plan,
     student_profile
 }: FacultyAuditorProps) {
@@ -179,9 +186,11 @@ export function FacultyAuditor({
         min_breadth_categories,
         completed,
         min_breadth_categories_notes,
-        matched_courses: breadth_matched_courses
+        matched_courses: breadth_matched_courses,
+        category_progress: breadth_category_progress
     } = AuditScienceBreadth(
         facultyRequirementLookup,
+        breadth_categories,
         student_course_plan
     )
     facult_requirement_results.push(
@@ -193,7 +202,8 @@ export function FacultyAuditor({
             required: min_breadth_categories,
             unit: "categories",
             matched_courses: breadth_matched_courses,
-            notes: min_breadth_categories_notes
+            notes: min_breadth_categories_notes,
+            category_progress: breadth_category_progress
         })
     )
 
@@ -254,7 +264,8 @@ function createFacultyRequirementResult({
     required,
     unit,
     matched_courses,
-    notes
+    notes,
+    category_progress
 }: RecordFacultyRequirementProps) {
     const getRequirementStatus = (required: number, completed: number): AuditRequirementStatus => {
         if (completed >= required) return "satisfied"
@@ -276,7 +287,8 @@ function createFacultyRequirementResult({
         surplus: surplus,
         unit: unit,
         matched_courses: matched_courses,
-        notes: notes
+        notes: notes,
+        ...(category_progress ? { category_progress } : {})
     }
 
     return total_credits_result
@@ -421,6 +433,7 @@ function AuditUpperLevelScience(
 
 function AuditScienceBreadth(
     facultyRequirementLookup: Record<string, FacultyRequirements>,
+    breadth_categories: string[],
     student_course_plan: CourseAttempt[]
 ) {
     // Resolve minimum science-breadth categories.
@@ -436,13 +449,31 @@ function AuditScienceBreadth(
         return accm;
     }, {} as Record<string, number>);
 
-    const completed_categories = Object.entries(category_credit_totals)
-        .filter(([_, credits]) => credits >= 3)
-        .map(([category, _]) => category);
+    // Report every known category (in rules order), including ones with no
+    // credits yet, plus any category seen on a course but missing from the
+    // rules so its credits are never silently dropped.
+    const all_categories = [
+        ...breadth_categories,
+        ...Object.keys(category_credit_totals).filter(
+            (category) => !breadth_categories.includes(category)
+        )
+    ];
 
-    const sorted_completed_categories = [...completed_categories].sort((a, b) => a.localeCompare(b));
+    const category_progress: CategoryProgress[] = all_categories.map((category) => {
+        const credits = category_credit_totals[category] ?? 0;
+        return {
+            category,
+            credits,
+            required_credits: MIN_BREADTH_CATEGORY_CREDITS,
+            completed: credits >= MIN_BREADTH_CATEGORY_CREDITS
+        }
+    });
 
-    const completedCategorySet = new Set(completed_categories);
+    const completedCategorySet = new Set(
+        category_progress
+            .filter((progress) => progress.completed)
+            .map((progress) => progress.category)
+    );
 
     const matchedCourses = student_course_plan.filter((course) =>
         course.breadth_categories.some((category) =>
@@ -453,15 +484,10 @@ function AuditScienceBreadth(
     const matched_courses = uniqueCourseCodes(matchedCourses)
 
     const min_breadth_categories_notes =
-        `Completed categories with at least 3 credits: ` +
-        `${sorted_completed_categories.join(', ')}`
-    const completed = completed_categories.length;
+        `A category counts once it has at least ${MIN_BREADTH_CATEGORY_CREDITS} credits.`
+    const completed = completedCategorySet.size;
 
-    // Tim's Python implementation does not attribute breadth completion to
-    // individual courses; matched_courses is always empty for this requirement.
-    // const matched_courses: string[] = [];
-
-    return { min_breadth_categories, completed, min_breadth_categories_notes, matched_courses }
+    return { min_breadth_categories, completed, min_breadth_categories_notes, matched_courses, category_progress }
 }
 
 function AuditLabRequirement(

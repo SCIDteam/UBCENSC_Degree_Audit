@@ -34,6 +34,7 @@ export function RunAudit({
         facultyRequirements,
         // courseRules,
         promotionRules,
+        breadthCategories,
         courseRequirements,
         specializationRequirementGroups,
         specializationRequirementCourses,
@@ -49,6 +50,7 @@ export function RunAudit({
             classified_courses: classified_courses,
             faculty_requirements: facultyRequirements,
             course_requirements: courseRequirements,
+            breadth_categories: breadthCategories,
             student_course_plan: filtered_course_plan,
             student_profile: student_profile
         })

@@ -13,6 +13,7 @@ export function LoadRules() {
     const facultyRequirements = auditRules.facultyRequirements as FacultyRequirements[];
     const courseRules = auditRules.courseRules as CourseRules[];
     const promotionRules = auditRules.promotionRules as PromotionRules[];
+    const breadthCategories = auditRules.breadthCategories as string[];
     const courseRequirements = auditRules.courseRequirements as CourseRequirements[];
     const specializationRequirementGroups = auditRules.specializationRequirementGroups as SpecializationRequirementGroup[];
     const specializationRequirementCourses = auditRules.specializationRequirementCourses as SpecializationRequirementCourse[];
@@ -22,6 +23,7 @@ export function LoadRules() {
         facultyRequirements, 
         courseRules, 
         promotionRules,
+        breadthCategories,
         courseRequirements,
         specializationRequirementGroups,
         specializationRequirementCourses,

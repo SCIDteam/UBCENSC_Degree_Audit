@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, X } from 'lucide-react'
 import type { AuditProgressUnit, AuditRequirementStatus, AuditResult, FacultyRequirementResult } from '../../types/audit'
 import RequirementStatusBadge from './RequirementStatusBadge'
 import { getStatusCardBorderClass } from './auditStatusStyles'
@@ -65,6 +65,49 @@ function formatSummaryLine(requirement: FacultyRequirementResult, isCap: boolean
   return null
 }
 
+// Per-category breakdown for categories-unit requirements (Science Breadth):
+// which categories are complete, credits so far in the rest, and which are
+// still open when the requirement is not yet met.
+function CategoryProgressList({ requirement }: { requirement: FacultyRequirementResult }) {
+  const { category_progress, status, remaining, label } = requirement
+  if (!category_progress || category_progress.length === 0) return null
+
+  const incomplete = category_progress.filter((progress) => !progress.completed)
+
+  return (
+    <div className="mt-1.5">
+      <ul aria-label={`${label} by category`} className="flex flex-wrap gap-1">
+        {category_progress.map((progress) => (
+          <li
+            key={progress.category}
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
+              progress.completed
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-border bg-muted text-muted-foreground'
+            }`}
+          >
+            {progress.completed ? <Check size={10} aria-hidden="true" /> : <X size={10} aria-hidden="true" />}
+            {progress.category}
+            {progress.completed ? (
+              <span className="sr-only">(completed)</span>
+            ) : (
+              <span className="font-normal tabular-nums">
+                {formatNumber(progress.credits)}/{formatNumber(progress.required_credits)} cr
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {status !== 'satisfied' && remaining > 0 && incomplete.length > 0 && (
+        <p className="mt-1 text-[11px] font-medium text-amber-700">
+          Need {formatNumber(remaining)} more {pluralizeUnit(remaining, 'categories')} from:{' '}
+          {incomplete.map((progress) => progress.category).join(', ')}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function FacultyRequirementCard({ requirement }: { requirement: FacultyRequirementResult }) {
   const [expanded, setExpanded] = useState(false)
   const { requirement_id, label, status, required, completed, matched_courses, notes } = requirement
@@ -106,6 +149,8 @@ function FacultyRequirementCard({ requirement }: { requirement: FacultyRequireme
       )}
 
       {summaryLine && <div className="mt-1 text-[11px] text-muted-foreground">{summaryLine}</div>}
+
+      <CategoryProgressList requirement={requirement} />
 
       {notes && (
         <p className="mt-1.5 border-t border-border pt-1.5 text-[10.5px] leading-snug text-muted-foreground">
