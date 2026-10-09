@@ -8,7 +8,7 @@ import CourseSearchPanel, {
   type CourseSearchPanelHandle,
 } from '../components/planner/CourseSearchPanel'
 import EditCourseModal from '../components/planner/AddCourseModal'
-import CourseCard from '../components/planner/CourseCard'
+import CourseCard, { COURSE_ATTEMPT_DRAG_TYPE } from '../components/planner/CourseCard'
 import CourseAddedToastRegion from '../components/planner/CourseAddedToastRegion'
 
 const TOAST_DURATION_MS = 3000
@@ -82,6 +82,10 @@ function resolveAcademicYearLabel(value: StudentSetupProfile['academic_year']) {
   return academicYears.find((year) => year.value === value)?.label ?? String(value)
 }
 
+function isCourseAttemptDrag(event: React.DragEvent) {
+  return event.dataTransfer.types.includes(COURSE_ATTEMPT_DRAG_TYPE)
+}
+
 function HeaderBadge({ children }: { children: React.ReactNode }) {
   return (
     <span className="whitespace-nowrap rounded-full bg-muted px-2.5 py-0.5 text-[11px] text-muted-foreground">
@@ -97,6 +101,7 @@ function TermColumn({
   highlightedAttemptIds,
   isAddTarget,
   onAddClick,
+  onDropAttempt,
   onEditAttempt,
   onDeleteAttempt,
 }: {
@@ -106,13 +111,37 @@ function TermColumn({
   highlightedAttemptIds: Set<string>
   isAddTarget: boolean
   onAddClick: () => void
+  onDropAttempt: (attemptId: string) => void
   onEditAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
 }) {
+  const [isDragOver, setIsDragOver] = useState(false)
+
   return (
     <div
+      onDragOver={(event) => {
+        if (!isCourseAttemptDrag(event)) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+        setIsDragOver(true)
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsDragOver(false)
+        }
+      }}
+      onDrop={(event) => {
+        if (!isCourseAttemptDrag(event)) return
+        event.preventDefault()
+        setIsDragOver(false)
+        onDropAttempt(event.dataTransfer.getData(COURSE_ATTEMPT_DRAG_TYPE))
+      }}
       className={`flex flex-col rounded-lg border bg-background/50 ${
-        isAddTarget ? 'border-ring ring-2 ring-ring/40' : 'border-border'
+        isDragOver
+          ? 'border-primary bg-accent/30 ring-2 ring-primary/40'
+          : isAddTarget
+            ? 'border-ring ring-2 ring-ring/40'
+            : 'border-border'
       }`}
     >
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
@@ -161,6 +190,7 @@ function PlannerSection({
   addTargetTerm,
   onToggle,
   onAddClick,
+  onDropAttempt,
   onEditAttempt,
   onDeleteAttempt,
 }: {
@@ -173,6 +203,7 @@ function PlannerSection({
   addTargetTerm: PlannerTerm | null
   onToggle: () => void
   onAddClick: (term: PlannerTerm) => void
+  onDropAttempt: (attemptId: string, term: PlannerTerm) => void
   onEditAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
 }) {
@@ -181,6 +212,10 @@ function PlannerSection({
       <button
         type="button"
         onClick={onToggle}
+        onDragEnter={(event) => {
+          // Expand a collapsed year so its term columns can receive the drop.
+          if (!expanded && isCourseAttemptDrag(event)) onToggle()
+        }}
         aria-expanded={expanded}
         className="flex w-full items-center gap-2.5 px-4 py-3 text-left transition-colors hover:bg-accent/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
       >
@@ -204,6 +239,7 @@ function PlannerSection({
               highlightedAttemptIds={highlightedAttemptIds}
               isAddTarget={addTargetTerm === term.id}
               onAddClick={() => onAddClick(term.id)}
+              onDropAttempt={(attemptId) => onDropAttempt(attemptId, term.id)}
               onEditAttempt={onEditAttempt}
               onDeleteAttempt={onDeleteAttempt}
             />
@@ -299,6 +335,25 @@ export default function PlannerScreen({
     )
   }
 
+  const highlightAttempt = (attemptId: string) => {
+    setHighlightedAttemptIds((prev) => new Set(prev).add(attemptId))
+    runAfterDelay(HIGHLIGHT_DURATION_MS, () => {
+      setHighlightedAttemptIds((prev) => {
+        const next = new Set(prev)
+        next.delete(attemptId)
+        return next
+      })
+    })
+  }
+
+  const handleDropAttempt = (attemptId: string, year: PlannerYear, term: PlannerTerm) => {
+    const attempt = attempts.find((candidate) => candidate.attempt_id === attemptId)
+    if (!attempt || (attempt.year_taken === year && attempt.term_taken === term)) return
+
+    onUpdateAttempt({ ...attempt, year_taken: year, term_taken: term })
+    highlightAttempt(attemptId)
+  }
+
   const handleSelectCourse = (course: CatalogueCourse) => {
     if (isRepeatBlocked(course.course_code)) {
       setBlockedNotice(REPEAT_BLOCKED_MESSAGE)
@@ -321,15 +376,7 @@ export default function PlannerScreen({
       source: 'manual'
     })
     setExpanded((prev) => new Set(prev).add(year))
-
-    setHighlightedAttemptIds((prev) => new Set(prev).add(attemptId))
-    runAfterDelay(HIGHLIGHT_DURATION_MS, () => {
-      setHighlightedAttemptIds((prev) => {
-        const next = new Set(prev)
-        next.delete(attemptId)
-        return next
-      })
-    })
+    highlightAttempt(attemptId)
 
     const toastId = crypto.randomUUID()
     setToasts((prev) => [{ id: toastId, courseCode: course.display_code, year, term }, ...prev].slice(0, MAX_VISIBLE_TOASTS))
@@ -451,6 +498,7 @@ export default function PlannerScreen({
               addTargetTerm={addTarget?.year === section.id ? addTarget.term : null}
               onToggle={() => toggleSection(section.id)}
               onAddClick={(term) => handleAddCourseClick(section.id, term)}
+              onDropAttempt={(attemptId, term) => handleDropAttempt(attemptId, section.id, term)}
               onEditAttempt={handleEditAttempt}
               onDeleteAttempt={onDeleteAttempt}
             />

@@ -1,6 +1,10 @@
 import { Pencil, Trash2 } from 'lucide-react'
 import type { CourseAttempt, StoredCourseGrade, StoredCourseStatus } from '../../types/coursePlan'
 
+// Drag payload type carrying an attempt_id, so planner term columns only
+// accept drops that originate from a course card.
+export const COURSE_ATTEMPT_DRAG_TYPE = 'application/x-ensc-course-attempt'
+
 const STATUS_LABELS: Record<StoredCourseStatus, string> = {
   completed: 'Taken',
   in_progress: 'In Progress',
@@ -79,7 +83,12 @@ export default function CourseCard({
 
   return (
     <div
-      className={`flex flex-col gap-1.5 rounded-md border border-border border-l-4 bg-card px-2.5 py-2 transition-colors duration-500 ${treatment.border} ${
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData(COURSE_ATTEMPT_DRAG_TYPE, attempt.attempt_id)
+        event.dataTransfer.effectAllowed = 'move'
+      }}
+      className={`flex cursor-grab flex-col gap-1.5 rounded-md border border-border border-l-4 bg-card px-2.5 py-2 transition-colors duration-500 active:cursor-grabbing ${treatment.border} ${
         isHighlighted ? 'ring-2 ring-ring bg-accent/20' : ''
       }`}
     >
