@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
-import { AlertCircle, Search, ChevronDown, ChevronUp } from 'lucide-react'
+import { AlertCircle, Search, ChevronDown, ChevronUp, X } from 'lucide-react'
 import type { CatalogueCourse } from '../../types/courseCatalogue'
 import { loadCourseCatalogue } from '../../utils/courseCatalogueLoader'
 
@@ -135,8 +135,14 @@ function CourseResult({
 
 const CourseSearchPanel = forwardRef<
   CourseSearchPanelHandle,
-  { onSelectCourse: (course: CatalogueCourse) => void }
->(function CourseSearchPanel({ onSelectCourse }, ref) {
+  {
+    onSelectCourse: (course: CatalogueCourse) => void
+    // Label of the year/term selected courses will be added to, or null when
+    // placement is inferred from each course's level and terms offered.
+    addTargetLabel: string | null
+    onClearAddTarget: () => void
+  }
+>(function CourseSearchPanel({ onSelectCourse, addTargetLabel, onClearAddTarget }, ref) {
   const [loadState, setLoadState] = useState<LoadState>({ status: 'loading' })
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -205,6 +211,24 @@ const CourseSearchPanel = forwardRef<
             className="w-full rounded-md border border-border bg-input-background py-2 pl-8 pr-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
           />
         </div>
+        {addTargetLabel && (
+          <div
+            aria-live="polite"
+            className="mt-2 flex items-center justify-between gap-2 rounded-md border border-ring/40 bg-accent/30 px-2.5 py-1.5 text-[11px] text-foreground"
+          >
+            <span>
+              Adding to <span className="font-semibold">{addTargetLabel}</span>
+            </span>
+            <button
+              type="button"
+              onClick={onClearAddTarget}
+              aria-label="Stop adding to this term"
+              className="flex-shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">

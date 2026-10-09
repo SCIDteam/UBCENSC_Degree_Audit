@@ -18,6 +18,11 @@ const MAX_VISIBLE_TOASTS = 3
 const REPEAT_BLOCKED_MESSAGE =
   'This course is already in the plan and cannot be added again unless all previous attempts were failed or withdrawn.'
 
+// Year/term selected via a term column's "Add course" button. While set,
+// courses picked from the search panel are placed here instead of being
+// inferred from course level and first term offered.
+type AddTarget = { year: PlannerYear; term: PlannerTerm }
+
 function mapCourseLevelToYear(level: number): PlannerYear {
   if (!Number.isFinite(level) || level < 100) {
     console.warn(`[PlannerScreen] Invalid course_level "${level}"; defaulting to Year 1`)
@@ -90,6 +95,7 @@ function TermColumn({
   attempts,
   repeatCodes,
   highlightedAttemptIds,
+  isAddTarget,
   onAddClick,
   onEditAttempt,
   onDeleteAttempt,
@@ -98,12 +104,17 @@ function TermColumn({
   attempts: CourseAttempt[]
   repeatCodes: Set<string>
   highlightedAttemptIds: Set<string>
+  isAddTarget: boolean
   onAddClick: () => void
   onEditAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
 }) {
   return (
-    <div className="flex flex-col rounded-lg border border-border bg-background/50">
+    <div
+      className={`flex flex-col rounded-lg border bg-background/50 ${
+        isAddTarget ? 'border-ring ring-2 ring-ring/40' : 'border-border'
+      }`}
+    >
       <div className="flex items-center justify-between border-b border-border px-3 py-2">
         <span className="font-heading text-[11px] font-semibold text-foreground">{label}</span>
       </div>
@@ -128,10 +139,13 @@ function TermColumn({
       <button
         type="button"
         onClick={onAddClick}
-        className="flex w-full flex-shrink-0 items-center gap-1 rounded-b-lg border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent/30 hover:text-primary"
+        aria-pressed={isAddTarget}
+        className={`flex w-full flex-shrink-0 items-center gap-1 rounded-b-lg border-t border-border px-3 py-1.5 text-[11px] transition-colors hover:bg-accent/30 hover:text-primary ${
+          isAddTarget ? 'bg-accent/30 font-semibold text-primary' : 'text-muted-foreground'
+        }`}
       >
         <Plus size={10} />
-        Add course
+        {isAddTarget ? 'Adding courses here' : 'Add course'}
       </button>
     </div>
   )
@@ -144,6 +158,7 @@ function PlannerSection({
   attempts,
   repeatCodes,
   highlightedAttemptIds,
+  addTargetTerm,
   onToggle,
   onAddClick,
   onEditAttempt,
@@ -155,8 +170,9 @@ function PlannerSection({
   attempts: CourseAttempt[]
   repeatCodes: Set<string>
   highlightedAttemptIds: Set<string>
+  addTargetTerm: PlannerTerm | null
   onToggle: () => void
-  onAddClick: () => void
+  onAddClick: (term: PlannerTerm) => void
   onEditAttempt: (attempt: CourseAttempt) => void
   onDeleteAttempt: (attemptId: string) => void
 }) {
@@ -186,7 +202,8 @@ function PlannerSection({
               )}
               repeatCodes={repeatCodes}
               highlightedAttemptIds={highlightedAttemptIds}
-              onAddClick={onAddClick}
+              isAddTarget={addTargetTerm === term.id}
+              onAddClick={() => onAddClick(term.id)}
               onEditAttempt={onEditAttempt}
               onDeleteAttempt={onDeleteAttempt}
             />
@@ -227,6 +244,7 @@ export default function PlannerScreen({
   const [blockedNotice, setBlockedNotice] = useState<string | null>(null)
   const [toasts, setToasts] = useState<CourseAddedToast[]>([])
   const [highlightedAttemptIds, setHighlightedAttemptIds] = useState<Set<string>>(new Set())
+  const [addTarget, setAddTarget] = useState<AddTarget | null>(null)
   const searchPanelRef = useRef<CourseSearchPanelHandle>(null)
   const timersRef = useRef<Set<number>>(new Set())
 
@@ -267,7 +285,8 @@ export default function PlannerScreen({
     })
   }
 
-  const handleAddCourseClick = () => {
+  const handleAddCourseClick = (year: PlannerYear, term: PlannerTerm) => {
+    setAddTarget({ year, term })
     searchPanelRef.current?.focusInput()
   }
 
@@ -287,8 +306,8 @@ export default function PlannerScreen({
     }
     setBlockedNotice(null)
 
-    const year = mapCourseLevelToYear(course.course_level)
-    const term = mapFirstTermOffered(course.terms_offered)
+    const year = addTarget?.year ?? mapCourseLevelToYear(course.course_level)
+    const term = addTarget?.term ?? mapFirstTermOffered(course.terms_offered)
     const attemptId = crypto.randomUUID()
 
     onAddAttempt({
@@ -386,7 +405,12 @@ export default function PlannerScreen({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-        <CourseSearchPanel ref={searchPanelRef} onSelectCourse={handleSelectCourse} />
+        <CourseSearchPanel
+          ref={searchPanelRef}
+          onSelectCourse={handleSelectCourse}
+          addTargetLabel={addTarget ? `${YEAR_LABELS[addTarget.year]} · ${TERM_LABELS[addTarget.term]}` : null}
+          onClearAddTarget={() => setAddTarget(null)}
+        />
 
         <main className="min-w-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-4">
           {auditError && (
@@ -424,8 +448,9 @@ export default function PlannerScreen({
               attempts={attempts}
               repeatCodes={repeatCodes}
               highlightedAttemptIds={highlightedAttemptIds}
+              addTargetTerm={addTarget?.year === section.id ? addTarget.term : null}
               onToggle={() => toggleSection(section.id)}
-              onAddClick={handleAddCourseClick}
+              onAddClick={(term) => handleAddCourseClick(section.id, term)}
               onEditAttempt={handleEditAttempt}
               onDeleteAttempt={onDeleteAttempt}
             />
